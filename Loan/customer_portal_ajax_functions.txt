@@ -1,0 +1,72 @@
+// Add these functions to your existing admin_class.php file
+
+function update_document_status(){
+    extract($_POST);
+    
+    $data = " status = '$status' ";
+    
+    $update = $this->db->query("UPDATE borrower_documents SET $data WHERE id = $id");
+    
+    if($update){
+        // Send notification to customer
+        $doc = $this->db->query("SELECT borrower_id, document_type FROM borrower_documents WHERE id = $id")->fetch_array();
+        $borrower_id = $doc['borrower_id'];
+        $doc_type = $doc['document_type'];
+        
+        $doc_type_labels = array(
+            'id' => 'Government ID',
+            'employment_proof' => 'Employment Proof',
+            'payslip' => 'Pay Slip'
+        );
+        
+        if($status == 1) {
+            $title = "Document Verified";
+            $message = "Your " . $doc_type_labels[$doc_type] . " has been verified successfully.";
+            $type = "success";
+        } else {
+            $title = "Document Rejected";
+            $message = "Your " . $doc_type_labels[$doc_type] . " was rejected. Reason: " . (isset($reason) ? $reason : 'Quality issues');
+            $type = "error";
+        }
+        
+        $this->db->query("INSERT INTO customer_notifications (borrower_id, title, message, type) 
+                         VALUES ($borrower_id, '$title', '$message', '$type')");
+        
+        return 1;
+    }
+}
+
+function get_customer_notifications(){
+    extract($_POST);
+    
+    $notifications = $this->db->query("SELECT * FROM customer_notifications 
+                                      WHERE borrower_id = $customer_id 
+                                      AND is_read = 0
+                                      ORDER BY created_at DESC");
+    
+    $count = $notifications->num_rows;
+    
+    $notif_html = '';
+    while($row = $notifications->fetch_assoc()){
+        $notif_html .= '
+        <div class="dropdown-item notification-item" data-id="'.$row['id'].'">
+            <div class="notification-content">
+                <strong>'.$row['title'].'</strong>
+                <p>'.$row['message'].'</p>
+                <small class="text-muted">'.date('M d, Y h:i A', strtotime($row['created_at'])).'</small>
+            </div>
+        </div>';
+    }
+    
+    return json_encode(array('count' => $count, 'html' => $notif_html));
+}
+
+function mark_notification_read(){
+    extract($_POST);
+    
+    $update = $this->db->query("UPDATE customer_notifications SET is_read = 1 WHERE id = $id");
+    
+    if($update){
+        return 1;
+    }
+}

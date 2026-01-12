@@ -1,0 +1,35 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+logs/
+*.log
+
+# Uploads and user files
+assets/uploads/
+uploads/
+
+# Vendor and node modules
+/vendor/
+node_modules/
+
+# Environment files
+.env
+*.env
+
+# Editor files
+*.sublime-workspace
+*.sublime-project
+.idea/
+*.swp
+
+# PHP specific
+.phpunit.result.cache
+
+# Database and local config
+config/db_connect.php
+*.sqlite
+
+# Ignore built artifacts
+dist/
