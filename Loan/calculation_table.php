@@ -39,9 +39,9 @@ if($amount > 0 && $months > 0) {
 		<th class="text-center" width="33.33%">Penalty Amount</th>
 	</tr>
 	<tr>
-		<td class="text-center"><small><?php echo formatKwacha($total_payable) ?></small></td>
-		<td class="text-center"><small><?php echo formatKwacha($monthly) ?></small></td>
-		<td class="text-center"><small><?php echo formatKwacha($penalty_amount) ?></small></td>
+		<td class="text-center"><small><?php echo formatCurrency($total_payable) ?></small></td>
+		<td class="text-center"><small><?php echo formatCurrency($monthly) ?></small></td>
+		<td class="text-center"><small><?php echo formatCurrency($penalty_amount) ?></small></td>
 	</tr>
 </table>
 <hr>
