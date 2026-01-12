@@ -1,4 +1,5 @@
-<?php include 'db_connect.php' ?>
+<?php include 'db_connect.php';
+require_once 'config/constants.php'; ?>
 
 <div class="container-fluid">
 	<div class="col-lg-12">
@@ -31,9 +32,7 @@
 
 						<!-- Amount -->
 						<div class="form-group">
-							<label>Loan Amount (K)</label>
-							<input type="number" class="form-control form-control-lg" id="amount" value="500" min="100" step="100">
-						</div>
+						<label>Loan Amount (<?php echo AppConfig::CURRENCY_SYMBOL ?>)</label>
 
 						<!-- Interest Rate -->
 						<div class="form-group">
@@ -64,24 +63,24 @@
 						<div class="row">
 							<div class="col-6">
 								<button class="btn btn-sm btn-outline-primary btn-block mb-2" onclick="setPreset(500, 30, 'simple')">
-									K500 @ 30%
+									<?php echo AppConfig::CURRENCY_SYMBOL ?>500 @ 30%
 								</button>
 								<button class="btn btn-sm btn-outline-primary btn-block mb-2" onclick="setPreset(1000, 30, 'simple')">
-									K1,000 @ 30%
+									<?php echo AppConfig::CURRENCY_SYMBOL ?>1,000 @ 30%
 								</button>
 								<button class="btn btn-sm btn-outline-primary btn-block" onclick="setPreset(2000, 30, 'simple')">
-									K2,000 @ 30%
+									<?php echo AppConfig::CURRENCY_SYMBOL ?>2,000 @ 30%
 								</button>
 							</div>
 							<div class="col-6">
 								<button class="btn btn-sm btn-outline-info btn-block mb-2" onclick="setPreset(5000, 35, 'simple')">
-									K5,000 @ 35%
+									<?php echo AppConfig::CURRENCY_SYMBOL ?>5,000 @ 35%
 								</button>
 								<button class="btn btn-sm btn-outline-info btn-block mb-2" onclick="setPreset(10000, 40, 'simple')">
-									K10,000 @ 40%
+									<?php echo AppConfig::CURRENCY_SYMBOL ?>10,000 @ 40%
 								</button>
 								<button class="btn btn-sm btn-outline-info btn-block" onclick="setPreset(20000, 45, 'simple')">
-									K20,000 @ 45%
+									<?php echo AppConfig::CURRENCY_SYMBOL ?>20,000 @ 45%
 								</button>
 							</div>
 						</div>
@@ -247,6 +246,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
 let breakdownChart = null;
+var currencySymbol = '<?php echo AppConfig::CURRENCY_SYMBOL ?>';
 
 // Toggle months field
 $('input[name="calc_type"]').change(function() {
@@ -299,16 +299,16 @@ function calculateSimple(amount, rate) {
 	$('#simple_results').show();
 	$('#compound_results').hide();
 
-	$('#simple_principal').text('K ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2}));
+	$('#simple_principal').text(currencySymbol + ' ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2}));
 	$('#simple_rate').text(rate + '%');
-	$('#simple_interest').text('K ' + interest.toLocaleString('en-US', {minimumFractionDigits: 2}));
-	$('#simple_total').text('K ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
+	$('#simple_interest').text(currencySymbol + ' ' + interest.toLocaleString('en-US', {minimumFractionDigits: 2}));
+	$('#simple_total').text(currencySymbol + ' ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
 
 	// Installment suggestions
-	$('#inst_1').text('K ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
-	$('#inst_2').text('K ' + (total / 2).toLocaleString('en-US', {minimumFractionDigits: 2}) + ' each');
-	$('#inst_3').text('K ' + (total / 3).toLocaleString('en-US', {minimumFractionDigits: 2}) + ' each');
-	$('#inst_4').text('K ' + (total / 4).toLocaleString('en-US', {minimumFractionDigits: 2}) + ' each');
+	$('#inst_1').text(currencySymbol + ' ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
+	$('#inst_2').text(currencySymbol + ' ' + (total / 2).toLocaleString('en-US', {minimumFractionDigits: 2}) + ' each');
+	$('#inst_3').text(currencySymbol + ' ' + (total / 3).toLocaleString('en-US', {minimumFractionDigits: 2}) + ' each');
+	$('#inst_4').text(currencySymbol + ' ' + (total / 4).toLocaleString('en-US', {minimumFractionDigits: 2}) + ' each');
 
 	// Update chart
 	updateChart('Simple Interest Breakdown', amount, interest);
@@ -324,12 +324,12 @@ function calculateCompound(amount, rate, months) {
 	$('#simple_results').hide();
 	$('#compound_results').show();
 
-	$('#compound_principal').text('K ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2}));
+	$('#compound_principal').text(currencySymbol + ' ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2}));
 	$('#compound_rate').text(rate + '% per annum');
 	$('#compound_months').text(months + ' months');
-	$('#compound_interest').text('K ' + totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2}));
-	$('#compound_total').text('K ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
-	$('#compound_monthly').text('K ' + monthly.toLocaleString('en-US', {minimumFractionDigits: 2}));
+	$('#compound_interest').text(currencySymbol + ' ' + totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2}));
+	$('#compound_total').text(currencySymbol + ' ' + total.toLocaleString('en-US', {minimumFractionDigits: 2}));
+	$('#compound_monthly').text(currencySymbol + ' ' + monthly.toLocaleString('en-US', {minimumFractionDigits: 2}));
 
 	// Update chart
 	updateChart('Compound Interest Breakdown', amount, totalInterest);
