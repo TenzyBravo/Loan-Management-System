@@ -6,6 +6,7 @@ if(!isset($_SESSION['customer_id'])){
 }
 
 include('db_connect.php');
+require_once __DIR__ . '/../includes/helpers.php';
 
 $customer_id = $_SESSION['customer_id'];
 
@@ -369,7 +370,7 @@ $loans_result = $conn->query($loans_query);
                     
                     <div class="detail-item">
                         <div class="detail-label">Loan Amount</div>
-                        <div class="detail-value">K <?php echo number_format($loan['amount'], 2); ?></div>
+                        <div class="detail-value"><?php echo formatCurrency($loan['amount']); ?></div>
                     </div>
                     
                     <div class="detail-item">
@@ -384,7 +385,7 @@ $loans_result = $conn->query($loans_query);
                     
                     <div class="detail-item">
                         <div class="detail-label">Monthly Payment</div>
-                        <div class="detail-value">K <?php echo number_format($monthly_payment, 2); ?></div>
+                        <div class="detail-value"><?php echo formatCurrency($monthly_payment); ?></div>
                     </div>
                     
                     <div class="detail-item">
