@@ -1,4 +1,5 @@
-<?php include 'db_connect.php' ?>
+<?php include 'db_connect.php';
+require_once __DIR__ . '/../includes/helpers.php'; ?>
 
 <div class="container-fluid">
 	<div class="col-lg-12">
@@ -40,20 +41,12 @@
 						<div class="card bg-info text-white">
 							<div class="card-body">
 								<h6>Amount Given</h6>
-								<h3>K <?php echo number_format($monthly_stats['total_given'] ?? 0, 2) ?></h3>
-							</div>
-						</div>
-					</div>
-					
+							<h3><?php echo formatCurrency($monthly_stats['total_given'] ?? 0) ?></h3>
 					<div class="col-md-3">
 						<div class="card bg-success text-white">
 							<div class="card-body">
 								<h6>Cash Interest</h6>
-								<h3>K <?php echo number_format($monthly_stats['total_interest'] ?? 0, 2) ?></h3>
-							</div>
-						</div>
-					</div>
-					
+							<h3><?php echo formatCurrency($monthly_stats['total_interest'] ?? 0) ?></h3>
 					<div class="col-md-3">
 						<div class="card bg-warning text-white">
 							<div class="card-body">
@@ -157,13 +150,13 @@
 								<td><b><?php echo $row['client_name'] ?></b></td>
 								<td><?php echo $row['guarantor_name'] ?? 'N/A' ?></td>
 								<td><?php echo $row['contact_no'] ?></td>
-								<td class="text-right">K <?php echo number_format($row['amount'], 2) ?></td>
+								<td class="text-right"><?php echo formatCurrency($row['amount']) ?></td>
 								<td><?php echo date('d-m-Y', $row['date_created']) ?></td>
 								<td class="text-center"><?php echo $row['interest_percentage'] ?>%</td>
-								<td class="text-right">K <?php echo number_format($cash_interest, 2) ?></td>
-								<td class="text-right"><b>K <?php echo number_format($total_payable, 2) ?></b></td>
-								<td class="text-right text-success">K <?php echo number_format($row['total_paid'], 2) ?></td>
-								<td class="text-right text-danger"><b>K <?php echo number_format($balance, 2) ?></b></td>
+								<td class="text-right"><?php echo formatCurrency($cash_interest) ?></td>
+								<td class="text-right"><b><?php echo formatCurrency($total_payable) ?></b></td>
+								<td class="text-right text-success"><?php echo formatCurrency($row['total_paid']) ?></td>
+								<td class="text-right text-danger"><b><?php echo formatCurrency($balance) ?></b></td>
 								<td class="text-center">
 									<span class="badge badge-<?php echo $status_class ?>"><?php echo $status_text ?></span>
 								</td>
@@ -181,13 +174,13 @@
 						<tfoot class="thead-light">
 							<tr>
 								<th colspan="4" class="text-right">TOTALS:</th>
-								<th class="text-right">K <?php echo number_format($total_given, 2) ?></th>
+								<th class="text-right"><?php echo formatCurrency($total_given) ?></th>
 								<th></th>
 								<th></th>
-								<th class="text-right">K <?php echo number_format($total_interest, 2) ?></th>
-								<th class="text-right">K <?php echo number_format($total_collect, 2) ?></th>
-								<th class="text-right text-success">K <?php echo number_format($total_paid_sum, 2) ?></th>
-								<th class="text-right text-danger">K <?php echo number_format($total_balance, 2) ?></th>
+								<th class="text-right"><?php echo formatCurrency($total_interest) ?></th>
+								<th class="text-right"><?php echo formatCurrency($total_collect) ?></th>
+								<th class="text-right text-success"><?php echo formatCurrency($total_paid_sum) ?></th>
+								<th class="text-right text-danger"><?php echo formatCurrency($total_balance) ?></th>
 								<th colspan="2"></th>
 							</tr>
 						</tfoot>
