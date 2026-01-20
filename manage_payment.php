@@ -23,8 +23,9 @@ if(isset($_GET['id'])){
 					<div class="form-group">
 						<label for="" class="control-label">Loan Reference No.</label>
 						<?php
+$status = 2; // Released loans only
 $stmt = $conn->prepare("SELECT * from loan_list where status = ?");
-$stmt->bind_param("i", 2);
+$stmt->bind_param("i", $status);
 $stmt->execute();
 $loan = $stmt->get_result();
 $stmt->close();
