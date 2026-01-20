@@ -5,20 +5,20 @@ require_once __DIR__ . '/../config/constants.php';
  * Finance helper functions
  */
 
-// Default interest rate (18% annually, approximately 1.5% monthly)
+// Default interest rate (18% for 1-month loans, annual rates for multi-month)
 const DEFAULT_ANNUAL_INTEREST_RATE = 18.0;
 
 /**
  * Calculate loan with interest applied to outstanding balance
  *
  * BUSINESS RULES:
- * - 1-month loans: ALWAYS 18% interest rate (auto-applied)
- * - Multi-month loans: Interest rate MUST be set by administrator
+ * - 1-month loans: ALWAYS 18% TOTAL interest (auto-applied)
+ * - Multi-month loans: Interest rate MUST be set by administrator (annual rates)
  */
 function calculateLoan(float $principal, float $annualInterestRate, int $months, string $calculationType = 'compound'): array {
     $isRateNotSet = false;
 
-    // STRICT BUSINESS RULE: 1-month loans = 18% fixed
+    // STRICT BUSINESS RULE: 1-month loans = 18% TOTAL (not annual)
     if ($months == 1) {
         $annualInterestRate = 18.0;
         $isRateNotSet = false; // Rate is correctly set by business rule
@@ -40,25 +40,37 @@ function calculateLoan(float $principal, float $annualInterestRate, int $months,
         throw new Exception("Invalid calculation type. Use 'simple' or 'compound'.");
     }
 
-    // Convert annual interest rate to monthly
-    $monthlyRate = $annualInterestRate / 12.0 / 100.0;
-
-    if ($calculationType === 'simple') {
-        // Simple interest on principal for the entire period
-        $totalInterest = $principal * $monthlyRate * $months;
+    // SPECIAL CASE: 1-month loans use the rate as TOTAL interest, not annual
+    if ($months == 1) {
+        // For 1-month loans: apply the full 18% as total interest
+        $totalInterest = $principal * ($annualInterestRate / 100.0);
         $totalPayable = $principal + $totalInterest;
     } else {
-        // Compound interest on outstanding balance
-        $totalPayable = $principal * pow(1 + $monthlyRate, $months);
-        $totalInterest = $totalPayable - $principal;
+        // For multi-month loans: treat as annual rate, convert to monthly
+        $monthlyRate = $annualInterestRate / 12.0 / 100.0;
+
+        if ($calculationType === 'simple') {
+            // Simple interest on principal for the entire period
+            $totalInterest = $principal * $monthlyRate * $months;
+            $totalPayable = $principal + $totalInterest;
+        } else {
+            // Compound interest on outstanding balance
+            $totalPayable = $principal * pow(1 + $monthlyRate, $months);
+            $totalInterest = $totalPayable - $principal;
+        }
     }
 
     $monthlyInstallment = $months > 0 ? $totalPayable / $months : $totalPayable;
 
+    // Calculate the effective monthly rate for display
+    $displayMonthlyRate = ($months == 1)
+        ? $annualInterestRate  // For 1-month: show as total rate
+        : round(($annualInterestRate / 12.0), 2);  // For multi-month: show monthly from annual
+
     return [
         'principal' => round($principal, 2),
         'annual_interest_rate' => $annualInterestRate,
-        'monthly_interest_rate' => round($monthlyRate * 100, 2),
+        'monthly_interest_rate' => $displayMonthlyRate,
         'calculation_type' => $calculationType,
         'months' => $months,
         'total_interest' => round($totalInterest, 2),
@@ -66,7 +78,7 @@ function calculateLoan(float $principal, float $annualInterestRate, int $months,
         'monthly_installment' => round($monthlyInstallment, 2),
         'currency' => 'K', // Zambian Kwacha
         'rate_not_set' => $isRateNotSet, // Flag: Admin must set rate for multi-month loans
-        'is_one_month' => ($months == 1), // Flag: Auto-applied 18% rate
+        'is_one_month' => ($months == 1), // Flag: Auto-applied 18% TOTAL rate
     ];
 }
 

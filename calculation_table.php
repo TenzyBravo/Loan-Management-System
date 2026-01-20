@@ -46,8 +46,8 @@ if($amount > 0 && $duration_months > 0) {
 <?php if($isOneMonth): ?>
 <div class="alert alert-success" style="background: #d1fae5; border-left: 4px solid #10b981; padding: 12px 15px; border-radius: 4px; margin-bottom: 15px;">
     <i class="fa fa-check-circle"></i>
-    <strong>Business Rule Applied:</strong> 1-month loans automatically receive <strong>18% interest rate</strong>.
-    <br><small>This is a fixed rate for all single-month loans.</small>
+    <strong>Business Rule Applied:</strong> 1-month loans automatically receive <strong>18% TOTAL interest</strong>.
+    <br><small>This is a fixed rate applied to the full loan amount (not an annual rate).</small>
 </div>
 <?php endif; ?>
 

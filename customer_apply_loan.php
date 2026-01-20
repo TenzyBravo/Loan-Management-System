@@ -299,7 +299,7 @@ $stmt->close();
                                             <small class="text-muted">Payment Period</small>
                                         </div>
                                         <div class="col-md-4">
-                                            <h5 class="mb-1">18%</h5>
+                                            <h5 class="mb-1">18% Total</h5>
                                             <small class="text-success"><strong>Fixed Rate (Auto-Applied)</strong></small>
                                         </div>
                                         <div class="col-md-4">
@@ -325,8 +325,8 @@ $stmt->close();
                                 <small class="form-text text-muted">
                                     <i class="fas fa-info-circle"></i>
                                     <strong>Interest Rate Policy:</strong><br>
-                                    • <strong>1-month loans:</strong> Fixed 18% interest rate (automatically applied)<br>
-                                    • <strong>Multi-month loans:</strong> Interest rate determined by administrator based on credit assessment and risk profile
+                                    • <strong>1-month loans:</strong> Fixed 18% total interest (automatically applied to full loan amount)<br>
+                                    • <strong>Multi-month loans:</strong> Annual interest rate (10-40%) determined by administrator based on credit assessment and risk profile
                                 </small>
                             </div>
 
@@ -410,8 +410,8 @@ $stmt->close();
 
                 if(canCalculate) {
                     // Calculate using simple interest (only for 1-month loans)
-                    var monthlyRate = interestRate / 100 / 12; // Monthly rate
-                    var totalInterest = amount * monthlyRate * durationMonths;
+                    // For 1-month loans: 18% is the TOTAL interest, not annual
+                    var totalInterest = amount * (interestRate / 100); // Direct percentage
                     var totalAmount = amount + totalInterest;
                     var monthlyPayment = totalAmount / durationMonths;
 
