@@ -12,6 +12,13 @@ const DEFAULT_ANNUAL_INTEREST_RATE = 18.0;
  * Calculate loan with interest applied to outstanding balance
  */
 function calculateLoan(float $principal, float $annualInterestRate, int $months, string $calculationType = 'compound'): array {
+    // Handle "Not Set" case (0) - use default for calculations but flag it
+    $isRateNotSet = false;
+    if ($annualInterestRate == 0) {
+        $annualInterestRate = DEFAULT_ANNUAL_INTEREST_RATE; // Use 18% as default
+        $isRateNotSet = true;
+    }
+
     // Validate interest rate against allowed values
     $allowedRates = [10.0, 18.0, 25.0, 28.0, 30.0, 35.0, 40.0];
     if (!in_array($annualInterestRate, $allowedRates, true)) {
@@ -47,6 +54,7 @@ function calculateLoan(float $principal, float $annualInterestRate, int $months,
         'total_payable' => round($totalPayable, 2),
         'monthly_installment' => round($monthlyInstallment, 2),
         'currency' => 'K', // Zambian Kwacha
+        'rate_not_set' => $isRateNotSet, // Flag if rate was defaulted
     ];
 }
 

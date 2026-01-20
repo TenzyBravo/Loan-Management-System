@@ -927,20 +927,31 @@ class SecureAction {
             }
             $stmt->close();
 
-            // Create notification for customer
-            $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type)
-                VALUES (?, 'Loan Approved', 'Your loan application (Ref: ?) has been approved with ?% interest rate. Total amount payable: ? over ? months.', 'success')");
-            $ref_no = $loan['ref_no'];
-            $formatted_total = formatCurrency($total_payable);
-            $stmt->bind_param("isssi",
-                $loan['borrower_id'],
-                $ref_no,
-                $interest_rate,
-                $formatted_total,
-                $duration_months
-            );
-            $stmt->execute();
-            $stmt->close();
+            // Create notification for customer (if table exists)
+            try {
+                $message = sprintf(
+                    'Your loan application (Ref: %s) has been approved with %.1f%% interest rate. Total amount payable: %s over %d months.',
+                    $loan['ref_no'],
+                    $interest_rate,
+                    formatCurrency($total_payable),
+                    $duration_months
+                );
+
+                $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
+                $title = 'Loan Approved';
+                $type = 'success';
+                $stmt->bind_param("isss",
+                    $loan['borrower_id'],
+                    $title,
+                    $message,
+                    $type
+                );
+                $stmt->execute();
+                $stmt->close();
+            } catch(Exception $e) {
+                // Notification failed but loan was approved - continue
+                error_log("Notification creation failed: " . $e->getMessage());
+            }
 
             return 1; // Success
 
