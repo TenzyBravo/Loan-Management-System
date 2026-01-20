@@ -10,13 +10,24 @@ const DEFAULT_ANNUAL_INTEREST_RATE = 18.0;
 
 /**
  * Calculate loan with interest applied to outstanding balance
+ *
+ * BUSINESS RULES:
+ * - 1-month loans: ALWAYS 18% interest rate (auto-applied)
+ * - Multi-month loans: Interest rate MUST be set by administrator
  */
 function calculateLoan(float $principal, float $annualInterestRate, int $months, string $calculationType = 'compound'): array {
-    // Handle "Not Set" case (0) - use default for calculations but flag it
     $isRateNotSet = false;
-    if ($annualInterestRate == 0) {
-        $annualInterestRate = DEFAULT_ANNUAL_INTEREST_RATE; // Use 18% as default
-        $isRateNotSet = true;
+
+    // STRICT BUSINESS RULE: 1-month loans = 18% fixed
+    if ($months == 1) {
+        $annualInterestRate = 18.0;
+        $isRateNotSet = false; // Rate is correctly set by business rule
+    }
+    // Multi-month loans: Rate MUST be provided by admin
+    elseif ($annualInterestRate == 0) {
+        // For preview calculations only, use 18% but flag it
+        $annualInterestRate = 18.0;
+        $isRateNotSet = true; // Flag: Admin must set rate before approval
     }
 
     // Validate interest rate against allowed values
@@ -54,7 +65,8 @@ function calculateLoan(float $principal, float $annualInterestRate, int $months,
         'total_payable' => round($totalPayable, 2),
         'monthly_installment' => round($monthlyInstallment, 2),
         'currency' => 'K', // Zambian Kwacha
-        'rate_not_set' => $isRateNotSet, // Flag if rate was defaulted
+        'rate_not_set' => $isRateNotSet, // Flag: Admin must set rate for multi-month loans
+        'is_one_month' => ($months == 1), // Flag: Auto-applied 18% rate
     ];
 }
 

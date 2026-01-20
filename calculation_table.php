@@ -24,6 +24,7 @@ if($amount > 0 && $duration_months > 0) {
         $totalInterest = $loanDetails['total_interest'];
         $currency = $loanDetails['currency'];
         $rateNotSet = $loanDetails['rate_not_set'] ?? false;
+        $isOneMonth = $loanDetails['is_one_month'] ?? false;
         $calculationSuccess = true;
     } catch (Exception $e) {
         $totalPayable = 0;
@@ -41,12 +42,21 @@ if($amount > 0 && $duration_months > 0) {
 
 ?>
 
-<!-- Warning: Rate Not Set -->
-<?php if($rateNotSet): ?>
+<!-- Info: 1-Month Loan Auto-Rate -->
+<?php if($isOneMonth): ?>
+<div class="alert alert-success" style="background: #d1fae5; border-left: 4px solid #10b981; padding: 12px 15px; border-radius: 4px; margin-bottom: 15px;">
+    <i class="fa fa-check-circle"></i>
+    <strong>Business Rule Applied:</strong> 1-month loans automatically receive <strong>18% interest rate</strong>.
+    <br><small>This is a fixed rate for all single-month loans.</small>
+</div>
+<?php endif; ?>
+
+<!-- Warning: Multi-Month Loan - Rate Not Set -->
+<?php if($rateNotSet && !$isOneMonth): ?>
 <div class="alert alert-warning" style="background: #fff3cd; border-left: 4px solid #f59e0b; padding: 12px 15px; border-radius: 4px; margin-bottom: 15px;">
     <i class="fa fa-exclamation-triangle"></i>
-    <strong>Note:</strong> Interest rate not set. Using default rate of <strong>18%</strong> for calculation preview.
-    <br><small>Please select the appropriate interest rate before saving the loan application.</small>
+    <strong>Warning:</strong> Interest rate must be set by an administrator for loans longer than 1 month.
+    <br><small>Using 18% for preview only. Please select the appropriate interest rate based on risk assessment before saving.</small>
 </div>
 <?php endif; ?>
 

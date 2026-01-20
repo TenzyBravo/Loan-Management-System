@@ -323,11 +323,33 @@ if(isset($_GET['id'])){
 
 		if(months) {
 			$('#duration_months').val(months);
+			checkDurationAndSetRate(); // Check if 1-month to auto-set rate
 		}
 		if(interest && $('#interest_rate').val() == '0') {
 			$('#interest_rate').val(interest);
 		}
 	}
+
+	// BUSINESS RULE: Auto-set 18% for 1-month loans
+	function checkDurationAndSetRate() {
+		var duration = parseInt($('#duration_months').val());
+
+		if(duration === 1) {
+			// 1-month loan: automatically set to 18%
+			$('#interest_rate').val('18.0');
+			$('#interest_rate').prop('disabled', true);
+			$('#interest_rate').after('<small class="text-success d-block mt-1" id="auto-rate-notice"><i class="fa fa-check-circle"></i> Auto-set: 1-month loans = 18%</small>');
+		} else {
+			// Multi-month loan: admin must select rate
+			$('#interest_rate').prop('disabled', false);
+			$('#auto-rate-notice').remove();
+		}
+	}
+
+	// Monitor duration changes
+	$('#duration_months').on('change keyup', function(){
+		checkDurationAndSetRate();
+	});
 
 	$('#calculate').click(function(){
 		calculate()
@@ -338,7 +360,7 @@ if(isset($_GET['id'])){
 
 		var amount = $('[name="amount"]').val();
 		var interest_rate = $('#interest_rate').val();
-		var duration_months = $('#duration_months').val();
+		var duration_months = parseInt($('#duration_months').val());
 		var calculation_type = $('#calculation_type').val();
 
 		if(amount == '' || amount <= 0){
@@ -347,16 +369,21 @@ if(isset($_GET['id'])){
 			return false;
 		}
 
-		if(interest_rate == '' || interest_rate == '0'){
-			alert_toast("Select interest rate first.","warning");
-			end_load();
-			return false;
-		}
-
 		if(duration_months == '' || duration_months <= 0){
 			alert_toast("Enter duration in months first.","warning");
 			end_load();
 			return false;
+		}
+
+		// BUSINESS RULE: 1-month loans auto-set to 18%
+		if(duration_months === 1) {
+			interest_rate = '18.0';
+			$('#interest_rate').val('18.0');
+		}
+		// Multi-month loans: require admin to set rate
+		else if(interest_rate == '' || interest_rate == '0'){
+			// Allow preview calculation but with warning
+			// The calculation_table.php will show the warning
 		}
 
 		$.ajax({
