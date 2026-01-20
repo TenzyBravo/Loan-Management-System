@@ -292,15 +292,15 @@ $stmt->close();
                                     <i class="fas fa-list"></i> Available Loan Plans (Reference Only)
                                 </label>
 
-                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #f8f9fa;">
+                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #d1fae5; border-left: 4px solid #10b981;">
                                     <div class="row">
                                         <div class="col-md-4">
-                                            <h5 class="mb-1">1 Month</h5>
+                                            <h5 class="mb-1"><i class="fas fa-check-circle text-success"></i> 1 Month</h5>
                                             <small class="text-muted">Payment Period</small>
                                         </div>
                                         <div class="col-md-4">
                                             <h5 class="mb-1">18%</h5>
-                                            <small class="text-muted">Interest Rate (Loans up to K5,000)</small>
+                                            <small class="text-success"><strong>Fixed Rate (Auto-Applied)</strong></small>
                                         </div>
                                         <div class="col-md-4">
                                             <h5 class="mb-1">5%</h5>
@@ -309,19 +309,15 @@ $stmt->close();
                                     </div>
                                 </div>
 
-                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #f8f9fa;">
+                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #fff3cd; border-left: 4px solid #f59e0b;">
                                     <div class="row">
                                         <div class="col-md-4">
-                                            <h5 class="mb-1">2+ Months</h5>
+                                            <h5 class="mb-1"><i class="fas fa-clock text-warning"></i> 2+ Months</h5>
                                             <small class="text-muted">Payment Period</small>
                                         </div>
-                                        <div class="col-md-4">
-                                            <h5 class="mb-1">28%</h5>
-                                            <small class="text-muted">Interest Rate (Loans over K5,000)</small>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h5 class="mb-1">5%</h5>
-                                            <small class="text-muted">Penalty Rate</small>
+                                        <div class="col-md-8">
+                                            <h5 class="mb-1">Rate Determined by Administrator</h5>
+                                            <small class="text-warning"><strong>Rate will be assigned based on your credit assessment (typically 10-40%)</strong></small>
                                         </div>
                                     </div>
                                 </div>
@@ -329,8 +325,8 @@ $stmt->close();
                                 <small class="form-text text-muted">
                                     <i class="fas fa-info-circle"></i>
                                     <strong>Interest Rate Policy:</strong><br>
-                                    • Loans ≤ K5,000: <strong>Automatic 18% interest rate</strong><br>
-                                    • Loans > K5,000: <strong>Custom rate assigned by admin</strong> based on credit assessment (typically 25-40%)
+                                    • <strong>1-month loans:</strong> Fixed 18% interest rate (automatically applied)<br>
+                                    • <strong>Multi-month loans:</strong> Interest rate determined by administrator based on credit assessment and risk profile
                                 </small>
                             </div>
 
@@ -397,31 +393,59 @@ $stmt->close();
             var durationMonths = parseInt($('#duration_months').val());
 
             if(amount && durationMonths) {
-                // Determine interest rate based on loan amount policy
+                // BUSINESS RULE: Interest rate based on DURATION, not amount
                 var interestRate;
                 var rateNote;
+                var canCalculate = true;
 
-                if(amount <= 5000) {
-                    interestRate = 18.0; // Auto-assigned 18% for small loans
-                    rateNote = interestRate + '% (Auto-assigned)';
+                if(durationMonths === 1) {
+                    // 1-month loans: ALWAYS 18% (auto-applied)
+                    interestRate = 18.0;
+                    rateNote = '18% (Fixed for 1-month loans)';
                 } else {
-                    interestRate = 28.0; // Conservative estimate for large loans
-                    rateNote = interestRate + '% (Estimated - Admin will assign actual rate)';
+                    // Multi-month loans: Rate determined by administrator
+                    // Show message instead of estimating
+                    canCalculate = false;
                 }
 
-                // Calculate using simple interest
-                var monthlyRate = interestRate / 100 / 12; // Monthly rate
-                var totalInterest = amount * monthlyRate * durationMonths;
-                var totalAmount = amount + totalInterest;
-                var monthlyPayment = totalAmount / durationMonths;
+                if(canCalculate) {
+                    // Calculate using simple interest (only for 1-month loans)
+                    var monthlyRate = interestRate / 100 / 12; // Monthly rate
+                    var totalInterest = amount * monthlyRate * durationMonths;
+                    var totalAmount = amount + totalInterest;
+                    var monthlyPayment = totalAmount / durationMonths;
 
-                // Display calculations
-                $('#calc-principal').text('K ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                $('#calc-interest-rate').text(rateNote);
-                $('#calc-interest').text('K ' + totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                $('#calc-total').text('K ' + totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                $('#calc-months').text(durationMonths);
-                $('#calc-monthly').text('K ' + monthlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                    // Display calculations
+                    $('#calc-principal').text('K ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                    $('#calc-interest-rate').text(rateNote);
+                    $('#calc-interest').text('K ' + totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                    $('#calc-total').text('K ' + totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                    $('#calc-months').text(durationMonths);
+                    $('#calc-monthly').text('K ' + monthlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+
+                    // Change calculation box styling to success (green) for 1-month loans
+                    $('#calculation-box').css({
+                        'background': '#d1fae5',
+                        'border-left': '4px solid #10b981'
+                    });
+                    $('#calculation-box h5').css('color', '#059669');
+                } else {
+                    // For multi-month loans, show informational message
+                    $('#calc-principal').text('K ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                    $('#calc-interest-rate').text('To be determined by administrator');
+                    $('#calc-interest').html('<em>Pending admin review</em>');
+                    $('#calc-total').html('<em>Will be calculated after rate assignment</em>');
+                    $('#calc-months').text(durationMonths);
+                    $('#calc-monthly').html('<em>Pending admin review</em>');
+
+                    // Change calculation box styling to warning (yellow) for multi-month loans
+                    $('#calculation-box').css({
+                        'background': '#fff3cd',
+                        'border-left': '4px solid #f59e0b'
+                    });
+                    $('#calculation-box h5').html('<i class="fas fa-info-circle"></i> Loan Information');
+                    $('#calculation-box h5').css('color', '#f57c00');
+                }
 
                 $('#calculation-box').slideDown();
             } else {
