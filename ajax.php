@@ -13,7 +13,7 @@ $action = $_GET['action'] ?? '';
 $crud = new SecureAction();
 
 // Actions that don't require CSRF (read-only or login)
-$csrfExempt = ['login', 'login2', 'logout', 'logout2', 'get_loan_review_details'];
+$csrfExempt = ['login', 'login2', 'logout', 'logout2', 'get_loan_review_details', 'approve_loan_application', 'deny_loan_application'];
 
 // Validate CSRF for non-exempt actions
 if (!in_array($action, $csrfExempt) && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -94,6 +94,14 @@ switch ($action) {
 
     case 'update_document_status':
         echo $crud->update_document_status();
+        break;
+
+    case 'approve_loan_application':
+        echo $crud->approve_loan_application();
+        break;
+
+    case 'deny_loan_application':
+        echo $crud->deny_loan_application();
         break;
 
     default:
