@@ -1,11 +1,16 @@
 <?php include 'db_connect.php' ?>
-<?php 
+<?php
 
 if(isset($_GET['id'])){
-	$qry = $conn->query("SELECT * FROM payments where id=".$_GET['id']);
+	$id = $_GET['id'];
+	$stmt = $conn->prepare("SELECT * FROM payments where id = ?");
+	$stmt->bind_param("i", $id);
+	$stmt->execute();
+	$qry = $stmt->get_result();
 	foreach($qry->fetch_array() as $k => $val){
 		$$k = $val;
 	}
+	$stmt->close();
 }
 
 ?>
@@ -18,7 +23,11 @@ if(isset($_GET['id'])){
 					<div class="form-group">
 						<label for="" class="control-label">Loan Reference No.</label>
 						<?php
-$loan = $conn->query("SELECT * from loan_list where status =2 ");
+$stmt = $conn->prepare("SELECT * from loan_list where status = ?");
+$stmt->bind_param("i", 2);
+$stmt->execute();
+$loan = $stmt->get_result();
+$stmt->close();
 						?>
 						<select name="loan_id" id="loan_id" class="custom-select browser-default select2">
 							<option value=""></option>

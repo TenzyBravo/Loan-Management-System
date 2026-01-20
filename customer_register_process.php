@@ -5,43 +5,51 @@ include('db_connect.php');
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // Get form data
-    $firstname = $conn->real_escape_string($_POST['firstname']);
-    $middlename = $conn->real_escape_string($_POST['middlename']);
-    $lastname = $conn->real_escape_string($_POST['lastname']);
-    $email = $conn->real_escape_string($_POST['email']);
-    $contact_no = $conn->real_escape_string($_POST['contact_no']);
-    $address = $conn->real_escape_string($_POST['address']);
-    $tax_id = $conn->real_escape_string($_POST['tax_id']);
-    $username = $conn->real_escape_string($_POST['username']);
-    $password = $_POST['password']; // In production, use password_hash()
+    $firstname = $_POST['firstname'];
+    $middlename = $_POST['middlename'];
+    $lastname = $_POST['lastname'];
+    $email = $_POST['email'];
+    $contact_no = $_POST['contact_no'];
+    $address = $_POST['address'];
+    $tax_id = $_POST['tax_id'];
+    $username = $_POST['username'];
+    $password = password_hash($_POST['password'], PASSWORD_DEFAULT); // Hash the password for security
     
-    // Validate passwords match
-    if($password !== $_POST['confirm_password']) {
+    // Validate passwords match before hashing
+    if($_POST['password'] !== $_POST['confirm_password']) {
         $_SESSION['error_msg'] = 'Passwords do not match!';
         header('Location: customer_register.php');
         exit;
     }
     
     // Check if username already exists
-    $check_username = $conn->query("SELECT id FROM borrowers WHERE username = '$username'");
+    $stmt = $conn->prepare("SELECT id FROM borrowers WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $check_username = $stmt->get_result();
     if($check_username->num_rows > 0) {
         $_SESSION['error_msg'] = 'Username already exists. Please choose another.';
         header('Location: customer_register.php');
         exit;
     }
+    $stmt->close();
     
     // Check if email already exists
-    $check_email = $conn->query("SELECT id FROM borrowers WHERE email = '$email'");
+    $stmt = $conn->prepare("SELECT id FROM borrowers WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $check_email = $stmt->get_result();
     if($check_email->num_rows > 0) {
         $_SESSION['error_msg'] = 'Email already registered. Please use another email or login.';
         header('Location: customer_register.php');
         exit;
     }
+    $stmt->close();
     
     // Create uploads directory if it doesn't exist
     $upload_dir = 'assets/uploads/customer_documents/';
     if (!file_exists($upload_dir)) {
-        mkdir($upload_dir, 0777, true);
+        mkdir($upload_dir, 0755, true);  // Secure permissions: owner can write, others can only read
     }
     
     // File upload handling
@@ -61,14 +69,27 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $file_tmp = $file['tmp_name'];
             $file_size = $file['size'];
             $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-            
+
             // Validate file extension
             $allowed_ext = array('jpg', 'jpeg', 'png', 'pdf');
             if(!in_array($file_ext, $allowed_ext)) {
                 $upload_errors[] = "Invalid file type for $field. Only JPG, PNG, and PDF allowed.";
                 continue;
             }
-            
+
+            // Validate MIME type for additional security
+            $allowed_mime_types = array(
+                'image/jpeg',
+                'image/jpg',
+                'image/png',
+                'application/pdf'
+            );
+            $file_mime = mime_content_type($file_tmp);
+            if(!in_array($file_mime, $allowed_mime_types)) {
+                $upload_errors[] = "Invalid file MIME type for $field. File appears to be: $file_mime";
+                continue;
+            }
+
             // Validate file size (5MB max)
             if($file_size > 5242880) {
                 $upload_errors[] = "File size for $field exceeds 5MB limit.";
@@ -105,30 +126,37 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $conn->begin_transaction();
     
     try {
-        // Insert borrower record
-        $sql = "INSERT INTO borrowers (firstname, middlename, lastname, contact_no, address, email, tax_id, username, password, status, date_created) 
-                VALUES ('$firstname', '$middlename', '$lastname', '$contact_no', '$address', '$email', '$tax_id', '$username', '$password', 1, " . time() . ")";
-        
-        if(!$conn->query($sql)) {
+        // Insert borrower record with username field (as per database modifications)
+        $stmt = $conn->prepare("INSERT INTO borrowers (firstname, middlename, lastname, contact_no, address, email, tax_id, username, password, status, date_created)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)");
+        $timestamp = time();
+        $stmt->bind_param("sssssssssi", $firstname, $middlename, $lastname, $contact_no, $address, $email, $tax_id, $username, $password, $timestamp);
+
+        if(!$stmt->execute()) {
             throw new Exception('Error creating account: ' . $conn->error);
         }
+        $stmt->close();
         
         $borrower_id = $conn->insert_id;
         
         // Insert document records
+        $stmt = $conn->prepare("INSERT INTO borrower_documents (borrower_id, document_type, file_name, file_path, file_size, status)
+                    VALUES (?, ?, ?, ?, ?, 0)");
         foreach($uploaded_files as $doc_type => $file_info) {
-            $doc_sql = "INSERT INTO borrower_documents (borrower_id, document_type, file_name, file_path, file_size, status) 
-                        VALUES ($borrower_id, '$doc_type', '{$file_info['name']}', '{$file_info['path']}', {$file_info['size']}, 0)";
-            
-            if(!$conn->query($doc_sql)) {
+            $stmt->bind_param("isssi", $borrower_id, $doc_type, $file_info['name'], $file_info['path'], $file_info['size']);
+
+            if(!$stmt->execute()) {
                 throw new Exception('Error saving documents: ' . $conn->error);
             }
         }
+        $stmt->close();
         
         // Create welcome notification
-        $notif_sql = "INSERT INTO customer_notifications (borrower_id, title, message, type) 
-                      VALUES ($borrower_id, 'Welcome!', 'Your account has been created successfully. Your documents are being reviewed by our team.', 'success')";
-        $conn->query($notif_sql);
+        $stmt = $conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type)
+                      VALUES (?, 'Welcome!', 'Your account has been created successfully. Your documents are being reviewed by our team.', 'success')");
+        $stmt->bind_param("i", $borrower_id);
+        $stmt->execute();
+        $stmt->close();
         
         // Commit transaction
         $conn->commit();

@@ -1,3 +1,15 @@
+<?php
+// Start session first
+session_start();
+
+// Check if already logged in
+if(isset($_SESSION['login_id']))
+    header("location:admin.php?page=home");
+
+include('./header.php');
+include('./db_connect.php');
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -7,15 +19,6 @@
 
   <title>Login | Loan Management System</title>
  	
-
-<?php include('./header.php'); ?>
-<?php include('./db_connect.php'); ?>
-<?php 
-session_start();
-if(isset($_SESSION['login_id']))
-header("location:index.php?page=home");
-
-?>
 
 </head>
 <style>
@@ -98,7 +101,7 @@ div#login-right::before {
   							<label for="password" class="control-label">Password</label>
   							<input type="password" id="password" name="password" class="form-control">
   						</div>
-  						<center><button class="btn-sm btn-block btn-wave col-md-4 btn-primary">Login</button></center>
+  						<center><button type="submit" class="btn-sm btn-block btn-wave col-md-4 btn-primary">Login</button></center>
   					</form>
   				</div>
   			</div>
@@ -114,7 +117,7 @@ div#login-right::before {
 <script>
 	$('#login-form').submit(function(e){
 		e.preventDefault()
-		$('#login-form button[type="button"]').attr('disabled',true).html('Logging in...');
+		$('#login-form button[type="submit"]').attr('disabled',true).html('Logging in...');
 		if($(this).find('.alert-danger').length > 0 )
 			$(this).find('.alert-danger').remove();
 		$.ajax({
@@ -123,17 +126,17 @@ div#login-right::before {
 			data:$(this).serialize(),
 			error:err=>{
 				console.log(err)
-		$('#login-form button[type="button"]').removeAttr('disabled').html('Login');
-
+				$('#login-form button[type="submit"]').removeAttr('disabled').html('Login');
 			},
 			success:function(resp){
+				console.log('Login response:', resp); // Debug log
 				if(resp == 1){
-					location.href ='index.php?page=home';
+					location.href ='admin.php?page=home';
 				}else if(resp == 2){
 					location.href ='voting.php';
 				}else{
 					$('#login-form').prepend('<div class="alert alert-danger">Username or password is incorrect.</div>')
-					$('#login-form button[type="button"]').removeAttr('disabled').html('Login');
+					$('#login-form button[type="submit"]').removeAttr('disabled').html('Login');
 				}
 			}
 		})

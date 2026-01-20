@@ -195,7 +195,7 @@ if(isset($_SESSION['customer_id'])){
                                     <label for="username">
                                         <i class="fas fa-user"></i> Username or Email
                                     </label>
-                                    <input type="text" class="form-control" id="username" name="username" 
+                                    <input type="text" class="form-control" id="username" name="username"
                                            placeholder="Enter your username or email" required>
                                 </div>
 

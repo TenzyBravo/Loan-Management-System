@@ -1,11 +1,16 @@
 <?php include 'db_connect.php' ?>
-<?php 
+<?php
 
 if(isset($_GET['id'])){
-	$qry = $conn->query("SELECT * FROM borrowers where id=".$_GET['id']);
+	$id = $_GET['id'];
+	$stmt = $conn->prepare("SELECT * FROM borrowers where id = ?");
+	$stmt->bind_param("i", $id);
+	$stmt->execute();
+	$qry = $stmt->get_result();
 	foreach($qry->fetch_array() as $k => $val){
 		$$k = $val;
 	}
+	$stmt->close();
 }
 
 ?>

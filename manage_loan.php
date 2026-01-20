@@ -1,10 +1,32 @@
-<?php 
+<?php
 include('db_connect.php');
+
+// Initialize loan data variables
+$loan_data = [];
 if(isset($_GET['id'])){
-$qry = $conn->query("SELECT * FROM loan_list where id = ".$_GET['id']);
-foreach($qry->fetch_array() as $k => $v){
-	$$k = $v;
-}
+	$id = $_GET['id'];
+	$stmt = $conn->prepare("SELECT * FROM loan_list where id = ?");
+	$stmt->bind_param("i", $id);
+	$stmt->execute();
+	$result = $stmt->get_result();
+	$loan_data = $result->fetch_assoc();
+	$stmt->close();
+
+	// Safely extract individual variables
+	if ($loan_data) {
+		$id = $loan_data['id'] ?? '';
+		$borrower_id = $loan_data['borrower_id'] ?? '';
+		$loan_type_id = $loan_data['loan_type_id'] ?? '';
+		$plan_id = $loan_data['plan_id'] ?? '';
+		$amount = $loan_data['amount'] ?? '';
+		$purpose = $loan_data['purpose'] ?? '';
+		$status = $loan_data['status'] ?? '';
+		$interest_rate = $loan_data['interest_rate'] ?? '';
+		$calculation_type = $loan_data['calculation_type'] ?? '';
+		$duration_months = $loan_data['duration_months'] ?? '';
+		$monthly_installment = $loan_data['monthly_installment'] ?? '';
+		$months = $loan_data['months'] ?? '';
+	}
 }
 ?>
 <div class="container-fluid">
@@ -45,7 +67,7 @@ foreach($qry->fetch_array() as $k => $v){
 				<?php
 				$plan = $conn->query("SELECT * FROM loan_plan order by `months` desc ");
 				?>
-				<select name="plan_id" id="plan_id" class="custom-select browser-default select2">
+				<select name="plan_id" id="plan_id" class="custom-select browser-default select2" onchange="updateDurationFromPlan()">
 					<option value=""></option>
 						<?php while($row = $plan->fetch_assoc()): ?>
 							<option value="<?php echo $row['id'] ?>" <?php echo isset($plan_id) && $plan_id == $row['id'] ? "selected" : '' ?> data-months="<?php echo $row['months'] ?>" data-interest_percentage="<?php echo $row['interest_percentage'] ?>" data-penalty_rate="<?php echo $row['penalty_rate'] ?>"><?php echo $row['months'] . ' month/s [ '.$row['interest_percentage'].'%, '.$row['penalty_rate'].'% ]' ?></option>
@@ -53,21 +75,49 @@ foreach($qry->fetch_array() as $k => $v){
 				</select>
 				<small>months [ interest%,penalty% ]</small>
 			</div>
-		<div class="form-group col-md-6">
-			<label class="control-label">Loan Amount</label>
-			<input type="number" name="amount" class="form-control text-right" step="any" id="" value="<?php echo isset($amount) ? $amount : '' ?>">
-		</div>
+			<div class="form-group col-md-6">
+				<label class="control-label">Loan Amount</label>
+				<input type="number" name="amount" class="form-control text-right" step="any" id="loan_amount" value="<?php echo isset($amount) ? $amount : '' ?>">
+			</div>
 		</div>
 		<div class="row">
 			<div class="form-group col-md-6">
-			<label class="control-label">Purpose</label>
-			<textarea name="purpose" id="" cols="30" rows="2" class="form-control"><?php echo isset($purpose) ? $purpose : '' ?></textarea>
+				<label class="control-label">Annual Interest Rate</label>
+				<select name="interest_rate" id="interest_rate" class="custom-select browser-default">
+					<option value="0" <?php echo (!isset($interest_rate) || $interest_rate == 0) ? "selected" : '' ?>>Not Set (Pending Review)</option>
+					<option value="10.0" <?php echo isset($interest_rate) && $interest_rate == 10.0 ? "selected" : '' ?>>10%</option>
+					<option value="18.0" <?php echo isset($interest_rate) && $interest_rate == 18.0 ? "selected" : '' ?>>18%</option>
+					<option value="25.0" <?php echo isset($interest_rate) && $interest_rate == 25.0 ? "selected" : '' ?>>25%</option>
+					<option value="28.0" <?php echo isset($interest_rate) && $interest_rate == 28.0 ? "selected" : '' ?>>28%</option>
+					<option value="30.0" <?php echo isset($interest_rate) && $interest_rate == 30.0 ? "selected" : '' ?>>30%</option>
+					<option value="35.0" <?php echo isset($interest_rate) && $interest_rate == 35.0 ? "selected" : '' ?>>35%</option>
+					<option value="40.0" <?php echo isset($interest_rate) && $interest_rate == 40.0 ? "selected" : '' ?>>40%</option>
+				</select>
+				<small class="text-muted">Loans ≤ K5,000 auto-assigned 18%. For loans > K5,000, select appropriate rate.</small>
+			</div>
+			<div class="form-group col-md-6">
+				<label class="control-label">Calculation Type</label>
+				<select name="calculation_type" id="calculation_type" class="custom-select browser-default">
+					<option value="simple" <?php echo (isset($calculation_type) && $calculation_type == 'simple') ? "selected" : '' ?>>Simple Interest</option>
+					<option value="compound" <?php echo (isset($calculation_type) && $calculation_type == 'compound') ? "selected" : '' ?>>Compound Interest</option>
+				</select>
+			</div>
 		</div>
-		
-		<div class="form-group col-md-2 offset-md-2 .justify-content-center">
-			<label class="control-label">&nbsp;</label>
-			<button class="btn btn-primary btn-sm btn-block align-self-end" type="button" id="calculate">Calculate</button>
+		<div class="row">
+			<div class="form-group col-md-6">
+				<label class="control-label">Purpose</label>
+				<textarea name="purpose" id="" cols="30" rows="2" class="form-control"><?php echo isset($purpose) ? $purpose : '' ?></textarea>
+			</div>
+			<div class="form-group col-md-6">
+				<label class="control-label">Duration (Months)</label>
+				<input type="number" name="duration_months" class="form-control text-right" step="1" id="duration_months" value="<?php echo isset($duration_months) ? $duration_months : (isset($months) ? $months : '') ?>">
+			</div>
 		</div>
+		<div class="row">
+			<div class="form-group col-md-2 offset-md-8 .justify-content-center">
+				<label class="control-label">&nbsp;</label>
+				<button class="btn btn-primary btn-sm btn-block align-self-end" type="button" id="calculate">Calculate</button>
+			</div>
 		</div>
 		<div id="calculation_table">
 			
@@ -110,32 +160,61 @@ foreach($qry->fetch_array() as $k => $v){
 		placeholder:"Please select here",
 		width:"100%"
 	})
+
+	// Function to update duration from selected plan
+	function updateDurationFromPlan() {
+		var plan = $("#plan_id option[value='"+$("#plan_id").val()+"']");
+		var months = plan.attr('data-months');
+		if(months) {
+			$('#duration_months').val(months);
+		}
+	}
+
 	$('#calculate').click(function(){
 		calculate()
 	})
-	
 
 	function calculate(){
 		start_load()
-		if($('#loan_plan_id').val() == '' && $('[name="amount"]').val() == ''){
-			alert_toast("Select plan and enter amount first.","warning");
+
+		var amount = $('[name="amount"]').val();
+		var interest_rate = $('#interest_rate').val();
+		var duration_months = $('#duration_months').val();
+		var calculation_type = $('#calculation_type').val();
+
+		if(amount == '' || amount <= 0){
+			alert_toast("Enter loan amount first.","warning");
 			return false;
 		}
-		var plan = $("#plan_id option[value='"+$("#plan_id").val()+"']")
+
+		if(interest_rate == ''){
+			alert_toast("Select interest rate first.","warning");
+			return false;
+		}
+
+		if(duration_months == '' || duration_months <= 0){
+			alert_toast("Enter duration in months first.","warning");
+			return false;
+		}
+
 		$.ajax({
 			url:"calculation_table.php",
 			method:"POST",
-			data:{amount:$('[name="amount"]').val(),months:plan.attr('data-months'),interest:plan.attr('data-interest_percentage'),penalty:plan.attr('data-penalty_rate')},
+			data:{
+				amount: amount,
+				interest_rate: interest_rate,
+				duration_months: duration_months,
+				calculation_type: calculation_type
+			},
 			success:function(resp){
 				if(resp){
-					
 					$('#calculation_table').html(resp)
 					end_load()
 				}
 			}
-
 		})
 	}
+
 	$('#loan-application').submit(function(e){
 		e.preventDefault()
 		start_load()
@@ -154,6 +233,7 @@ foreach($qry->fetch_array() as $k => $v){
 			}
 		})
 	})
+
 	$(document).ready(function(){
 		if('<?php echo isset($_GET['id']) ?>' == 1)
 			calculate()

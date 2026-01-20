@@ -348,7 +348,7 @@ if(isset($_SESSION['customer_id'])){
 
                     <div class="form-group">
                         <label class="required-field">Username</label>
-                        <input type="text" class="form-control" name="username" 
+                        <input type="text" class="form-control" name="username"
                                placeholder="Choose a unique username" required>
                         <small class="form-text text-muted">
                             This will be used to log in to your account

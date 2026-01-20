@@ -10,32 +10,50 @@ include('db_connect.php');
 $customer_id = $_SESSION['customer_id'];
 
 // Get customer info
-$customer_query = $conn->query("SELECT * FROM borrowers WHERE id = $customer_id");
-$customer = $customer_query->fetch_assoc();
+$stmt = $conn->prepare("SELECT * FROM borrowers WHERE id = ?");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$customer = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 // Get loan count and stats
-$loans_query = $conn->query("SELECT COUNT(*) as total, 
+$stmt = $conn->prepare("SELECT COUNT(*) as total,
                              SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) as pending,
                              SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END) as active,
                              SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) as completed
-                             FROM loan_list WHERE borrower_id = $customer_id");
-$loan_stats = $loans_query->fetch_assoc();
+                             FROM loan_list WHERE borrower_id = ?");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$loan_stats = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 // Get recent loans
-$recent_loans = $conn->query("SELECT l.*, lt.type_name, lp.months, lp.interest_percentage 
-                              FROM loan_list l 
-                              LEFT JOIN loan_types lt ON l.loan_type_id = lt.id 
-                              LEFT JOIN loan_plan lp ON l.plan_id = lp.id 
-                              WHERE l.borrower_id = $customer_id 
+$stmt = $conn->prepare("SELECT l.*, lt.type_name, lp.months, lp.interest_percentage
+                              FROM loan_list l
+                              LEFT JOIN loan_types lt ON l.loan_type_id = lt.id
+                              LEFT JOIN loan_plan lp ON l.plan_id = lp.id
+                              WHERE l.borrower_id = ?
                               ORDER BY l.date_created DESC LIMIT 5");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$recent_loans = $stmt->get_result();
+$stmt->close();
 
 // Get notifications
-$notifications = $conn->query("SELECT * FROM customer_notifications 
-                               WHERE borrower_id = $customer_id 
+$stmt = $conn->prepare("SELECT * FROM customer_notifications
+                               WHERE borrower_id = ?
                                ORDER BY created_at DESC LIMIT 5");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$notifications = $stmt->get_result();
+$stmt->close();
 
 // Get document status
-$documents = $conn->query("SELECT * FROM borrower_documents WHERE borrower_id = $customer_id");
+$stmt = $conn->prepare("SELECT * FROM borrower_documents WHERE borrower_id = ?");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$documents = $stmt->get_result();
+$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -266,7 +284,7 @@ $documents = $conn->query("SELECT * FROM borrower_documents WHERE borrower_id = 
                                         <tr>
                                             <td><strong><?php echo $loan['ref_no']; ?></strong></td>
                                             <td><?php echo $loan['type_name']; ?></td>
-                                            <td>$<?php echo number_format($loan['amount'], 2); ?></td>
+                                            <td>K <?php echo number_format($loan['amount'], 2); ?></td>
                                             <td>
                                                 <?php
                                                 $status_class = '';

@@ -1,39 +1,70 @@
-<?php 
+<?php
+require_once __DIR__ . '/includes/finance.php';
+
 // Extract POST data safely
 extract($_POST);
 
 // Validate and set defaults for required variables
 $amount = isset($amount) && is_numeric($amount) ? floatval($amount) : 0;
-$interest = isset($interest) && is_numeric($interest) ? floatval($interest) : 0;
-$months = isset($months) && is_numeric($months) && $months > 0 ? intval($months) : 1;
-$penalty = isset($penalty) && is_numeric($penalty) ? floatval($penalty) : 0;
+$interest_rate = isset($interest_rate) && is_numeric($interest_rate) ? floatval($interest_rate) : 18.0; // Default to 18%
+$duration_months = isset($duration_months) && is_numeric($duration_months) && $duration_months > 0 ? intval($duration_months) : 1;
+$calculation_type = isset($calculation_type) && in_array($calculation_type, ['simple', 'compound']) ? $calculation_type : 'compound';
 
 // Only calculate if we have valid data
-if($amount > 0 && $months > 0) {
-	$monthly = ($amount + ($amount * ($interest/100))) / $months;
-	$penalty_amount = $monthly * ($penalty/100);
+if($amount > 0 && $duration_months > 0) {
+    try {
+        $loanDetails = calculateLoan($amount, $interest_rate, $duration_months, $calculation_type);
+        $totalPayable = $loanDetails['total_payable'];
+        $monthlyInstallment = $loanDetails['monthly_installment'];
+        $totalInterest = $loanDetails['total_interest'];
+        $currency = $loanDetails['currency'];
+    } catch (Exception $e) {
+        $totalPayable = 0;
+        $monthlyInstallment = 0;
+        $totalInterest = 0;
+        $currency = 'K';
+    }
 } else {
-	$monthly = 0;
-	$penalty_amount = 0;
+    $totalPayable = 0;
+    $monthlyInstallment = 0;
+    $totalInterest = 0;
+    $currency = 'K';
 }
 
 ?>
 <hr>
-<table width="100%">
-	<tr>
-		<th class="text-center" width="33.33%">Total Payable Amount</th>
-		<th class="text-center" width="33.33%">Monthly Payable Amount</th>
-		<th class="text-center" width="33.33%">Penalty Amount</th>
-	</tr>
-	<tr>
-		<td class="text-center"><small><?php echo number_format($monthly * $months, 2) ?></small></td>
-		<td class="text-center"><small><?php echo number_format($monthly, 2) ?></small></td>
-		<td class="text-center"><small><?php echo number_format($penalty_amount, 2) ?></small></td>
-	</tr>
+<div class="row">
+    <div class="col-md-12">
+        <h5>Loan Calculation Summary</h5>
+    </div>
+</div>
+<table width="100%" class="table table-bordered">
+    <tr>
+        <th class="text-center" width="25%">Principal Amount</th>
+        <th class="text-center" width="25%">Interest Rate</th>
+        <th class="text-center" width="25%">Total Interest</th>
+        <th class="text-center" width="25%">Total Payable</th>
+    </tr>
+    <tr>
+        <td class="text-center"><small><?php echo $currency . ' ' . number_format($amount, 2) ?></small></td>
+        <td class="text-center"><small><?php echo $interest_rate . '%' . ($calculation_type == 'compound' ? ' (Compounded)' : ' (Simple)') ?></small></td>
+        <td class="text-center"><small><?php echo $currency . ' ' . number_format($totalInterest, 2) ?></small></td>
+        <td class="text-center"><small><?php echo $currency . ' ' . number_format($totalPayable, 2) ?></small></td>
+    </tr>
+</table>
+<table width="100%" class="table table-bordered mt-2">
+    <tr>
+        <th class="text-center" width="50%">Duration (Months)</th>
+        <th class="text-center" width="50%">Monthly Installment</th>
+    </tr>
+    <tr>
+        <td class="text-center"><small><?php echo $duration_months . ' months' ?></small></td>
+        <td class="text-center"><small><?php echo $currency . ' ' . number_format($monthlyInstallment, 2) ?></small></td>
+    </tr>
 </table>
 <hr>
-<?php if($amount == 0 || $months == 0): ?>
+<?php if($amount == 0 || $duration_months == 0): ?>
 <div class="alert alert-warning text-center">
-	<small>Please select a loan plan to calculate payment details</small>
+    <small>Please enter loan amount and duration to calculate payment details</small>
 </div>
 <?php endif; ?>

@@ -13,12 +13,17 @@ $action = $_GET['action'] ?? '';
 $crud = new SecureAction();
 
 // Actions that don't require CSRF (read-only or login)
-$csrfExempt = ['login', 'login2', 'logout', 'logout2'];
+$csrfExempt = ['login', 'login2', 'logout', 'logout2', 'get_loan_review_details'];
 
 // Validate CSRF for non-exempt actions
 if (!in_array($action, $csrfExempt) && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Skip CSRF for initial AJAX calls that might not have token
-    // In production, you should enforce CSRF for all POST requests
+    $token = $_POST['csrf_token'] ?? '';
+    if (!Security::validateCSRFToken($token)) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token. Please refresh the page and try again.']);
+        ob_end_flush();
+        exit;
+    }
 }
 
 // Route to appropriate action
@@ -82,7 +87,15 @@ switch ($action) {
     case 'change_password':
         echo $crud->change_password();
         break;
-        
+
+    case 'get_loan_review_details':
+        echo $crud->get_loan_review_details();
+        break;
+
+    case 'update_document_status':
+        echo $crud->update_document_status();
+        break;
+
     default:
         echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
         break;

@@ -3,7 +3,11 @@
 
   
 
-  <!-- Google Fonts -->
+  <!-- Google Fonts - Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <!-- Fallback for older browsers -->
   <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Raleway:300,300i,400,400i,500,500i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
     <link rel="stylesheet" href="assets/font-awesome/css/all.min.css">
 
@@ -41,5 +45,15 @@
     <script type="text/javascript" src="assets/font-awesome/js/all.min.js"></script>
   <script type="text/javascript" src="assets/js/jquery-te-1.4.0.min.js" charset="utf-8"></script>
 
+  <!-- Vue.js 3 with IE11 Polyfills -->
+  <!-- Polyfills for IE11 compatibility -->
+  <script src="https://cdn.jsdelivr.net/npm/core-js-bundle@3.25.5/minified.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/regenerator-runtime@0.13.11/runtime.min.js"></script>
+
+  <!-- Vue.js 3 -->
+  <script src="https://unpkg.com/vue@3.2.47/dist/vue.global.prod.js"></script>
+
+  <!-- Form Validation Utilities -->
+  <script src="assets/js/form-validation.js"></script>
 
 

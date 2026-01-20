@@ -1,4 +1,8 @@
-<?php include 'db_connect.php' ?>
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+include 'db_connect.php';
+?>
 
 <div class="container-fluid">
 	<div class="col-lg-12">
@@ -56,14 +60,15 @@
 								                  $plan_arr[$row['plan_id']]['months'] > 0;
 								
 								if($has_valid_plan) {
-					// Prefer precomputed monthly_installment if available
-					if(isset($row['monthly_installment']) && $row['monthly_installment'] > 0) {
-						$monthly = $row['monthly_installment'];
-						$penalty = $monthly * ($plan_arr[$row['plan_id']]['penalty_rate']/100);
-					} else {
-						$monthly = ($row['amount'] + ($row['amount'] * ($plan_arr[$row['plan_id']]['interest_percentage']/100))) / $plan_arr[$row['plan_id']]['months'];
-						$penalty = $monthly * ($plan_arr[$row['plan_id']]['penalty_rate']/100);
-					}
+									// Prefer precomputed monthly_installment if available
+									if(isset($row['monthly_installment']) && $row['monthly_installment'] > 0) {
+										$monthly = $row['monthly_installment'];
+										$penalty = $monthly * ($plan_arr[$row['plan_id']]['penalty_rate']/100);
+									} else {
+										$monthly = ($row['amount'] + ($row['amount'] * ($plan_arr[$row['plan_id']]['interest_percentage']/100))) / $plan_arr[$row['plan_id']]['months'];
+										$penalty = $monthly * ($plan_arr[$row['plan_id']]['penalty_rate']/100);
+									}
+								} else {
 									// Default values if no valid plan
 									$monthly = 0;
 									$penalty = 0;
@@ -163,15 +168,19 @@
 	}
 </style>	
 <script>
-	$('#loan-list').dataTable()
-	$('#new_application').click(function(){
-		uni_modal("New Loan Application","manage_loan.php",'mid-large')
-	})
-	$('.edit_loan').click(function(){
-		uni_modal("Edit Loan","manage_loan.php?id="+$(this).attr('data-id'),'mid-large')
-	})
-	$('.delete_loan').click(function(){
-		_conf("Are you sure to delete this data?","delete_loan",[$(this).attr('data-id')])
+	$(document).ready(function(){
+		$('#loan-list').dataTable()
+		$('#new_application').click(function(){
+			// Use modern slide-over instead of modal
+			slide_over("New Loan Application", "manage_loan.php", 'xl')
+		})
+		$('.edit_loan').click(function(){
+			// Use modern slide-over instead of modal
+			slide_over("Edit Loan", "manage_loan.php?id=" + $(this).attr('data-id'), 'xl')
+		})
+		$('.delete_loan').click(function(){
+			_conf("Are you sure to delete this data?","delete_loan",[$(this).attr('data-id')])
+		})
 	})
 function delete_loan($id){
 		start_load()

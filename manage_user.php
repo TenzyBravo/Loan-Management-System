@@ -1,10 +1,15 @@
-<?php 
+<?php
 include('db_connect.php');
 if(isset($_GET['id'])){
-$user = $conn->query("SELECT * FROM users where id =".$_GET['id']);
-foreach($user->fetch_array() as $k =>$v){
-	$meta[$k] = $v;
-}
+	$id = $_GET['id'];
+	$stmt = $conn->prepare("SELECT * FROM users where id = ?");
+	$stmt->bind_param("i", $id);
+	$stmt->execute();
+	$user = $stmt->get_result();
+	foreach($user->fetch_array() as $k =>$v){
+		$meta[$k] = $v;
+	}
+	$stmt->close();
 }
 ?>
 <div class="container-fluid">

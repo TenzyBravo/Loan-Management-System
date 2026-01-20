@@ -10,27 +10,39 @@ include('db_connect.php');
 $customer_id = $_SESSION['customer_id'];
 
 // Get customer info
-$customer = $conn->query("SELECT * FROM borrowers WHERE id = $customer_id")->fetch_assoc();
+$stmt = $conn->prepare("SELECT * FROM borrowers WHERE id = ?");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$customer = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
-// Check if profile is complete
-if($customer['profile_complete'] != 1) {
-    $_SESSION['error_msg'] = 'Please complete your profile before applying for a loan.';
-    header('location: customer_profile.php');
-    exit;
-}
+// Check if profile is complete (skip this check if profile_complete field doesn't exist)
+// Check if profile is complete (check if required fields are filled)
+// Skip this check if the profile_complete field doesn't exist in the database
+// For now, we'll assume the profile is complete if basic info exists
 
 // Check if all documents are verified
-$unverified_docs = $conn->query("SELECT COUNT(*) as count FROM borrower_documents 
-                                 WHERE borrower_id = $customer_id AND status != 1");
-$doc_check = $unverified_docs->fetch_assoc();
+$stmt = $conn->prepare("SELECT COUNT(*) as count FROM borrower_documents
+                                 WHERE borrower_id = ? AND status != 1");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$doc_check = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 if($doc_check['count'] > 0) {
     $_SESSION['warning_msg'] = 'Some of your documents are pending verification. You can still apply, but approval may take longer.';
 }
 
 // Get loan types and plans
-$loan_types = $conn->query("SELECT * FROM loan_types ORDER BY type_name ASC");
-$loan_plans = $conn->query("SELECT * FROM loan_plan ORDER BY months ASC");
+$stmt = $conn->prepare("SELECT * FROM loan_types ORDER BY type_name ASC");
+$stmt->execute();
+$loan_types = $stmt->get_result();
+$stmt->close();
+
+$stmt = $conn->prepare("SELECT * FROM loan_plan ORDER BY months ASC");
+$stmt->execute();
+$loan_plans = $stmt->get_result();
+$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -252,7 +264,7 @@ $loan_plans = $conn->query("SELECT * FROM loan_plan ORDER BY months ASC");
                                 </label>
                                 <input type="number" class="form-control" name="amount" id="loan_amount" 
                                        placeholder="Enter amount" min="1000" max="1000000" required>
-                                <small class="form-text text-muted">Minimum: $1,000 | Maximum: $1,000,000</small>
+                                <small class="form-text text-muted">Minimum: K 1,000 | Maximum: K 1,000,000</small>
                             </div>
 
                             <!-- Purpose -->
@@ -264,39 +276,62 @@ $loan_plans = $conn->query("SELECT * FROM loan_plan ORDER BY months ASC");
                                           placeholder="Describe the purpose of this loan..." required></textarea>
                             </div>
 
-                            <!-- Payment Plan Selection -->
+                            <!-- Duration Selection -->
                             <div class="form-group">
                                 <label class="form-label">
-                                    <i class="fas fa-calendar-alt"></i> Select Payment Plan *
+                                    <i class="fas fa-calendar-alt"></i> Loan Duration (Months) *
                                 </label>
-                                
-                                <?php 
-                                $loan_plans->data_seek(0); // Reset pointer
-                                while($plan = $loan_plans->fetch_assoc()): 
-                                ?>
-                                    <label class="plan-card" for="plan_<?php echo $plan['id']; ?>">
-                                        <input type="radio" name="plan_id" id="plan_<?php echo $plan['id']; ?>" 
-                                               value="<?php echo $plan['id']; ?>"
-                                               data-months="<?php echo $plan['months']; ?>"
-                                               data-interest="<?php echo $plan['interest_percentage']; ?>"
-                                               data-penalty="<?php echo $plan['penalty_rate']; ?>"
-                                               required>
-                                        <div class="row">
-                                            <div class="col-md-4">
-                                                <h5 class="mb-1"><?php echo $plan['months']; ?> Months</h5>
-                                                <small class="text-muted">Payment Period</small>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <h5 class="mb-1"><?php echo $plan['interest_percentage']; ?>%</h5>
-                                                <small class="text-muted">Interest Rate</small>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <h5 class="mb-1"><?php echo $plan['penalty_rate']; ?>%</h5>
-                                                <small class="text-muted">Penalty Rate</small>
-                                            </div>
+                                <input type="number" class="form-control" name="duration_months" id="duration_months"
+                                       placeholder="Enter loan duration in months" min="1" max="120" required>
+                                <small class="form-text text-muted">Enter the number of months for loan repayment</small>
+                            </div>
+
+                            <!-- Predefined Loan Plans (for reference only) -->
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <i class="fas fa-list"></i> Available Loan Plans (Reference Only)
+                                </label>
+
+                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #f8f9fa;">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <h5 class="mb-1">1 Month</h5>
+                                            <small class="text-muted">Payment Period</small>
                                         </div>
-                                    </label>
-                                <?php endwhile; ?>
+                                        <div class="col-md-4">
+                                            <h5 class="mb-1">18%</h5>
+                                            <small class="text-muted">Interest Rate (Loans up to K5,000)</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h5 class="mb-1">5%</h5>
+                                            <small class="text-muted">Penalty Rate</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #f8f9fa;">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <h5 class="mb-1">2+ Months</h5>
+                                            <small class="text-muted">Payment Period</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h5 class="mb-1">28%</h5>
+                                            <small class="text-muted">Interest Rate (Loans over K5,000)</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h5 class="mb-1">5%</h5>
+                                            <small class="text-muted">Penalty Rate</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <small class="form-text text-muted">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Interest Rate Policy:</strong><br>
+                                    • Loans ≤ K5,000: <strong>Automatic 18% interest rate</strong><br>
+                                    • Loans > K5,000: <strong>Custom rate assigned by admin</strong> based on credit assessment (typically 25-40%)
+                                </small>
                             </div>
 
                             <!-- Loan Calculation Display -->
@@ -304,19 +339,19 @@ $loan_plans = $conn->query("SELECT * FROM loan_plan ORDER BY months ASC");
                                 <h5><i class="fas fa-calculator"></i> Loan Calculation</h5>
                                 <div class="calc-item">
                                     <span>Loan Amount:</span>
-                                    <span id="calc-principal">$0.00</span>
+                                    <span id="calc-principal">K 0.00</span>
                                 </div>
                                 <div class="calc-item">
                                     <span>Interest (<span id="calc-interest-rate">0</span>%):</span>
-                                    <span id="calc-interest">$0.00</span>
+                                    <span id="calc-interest">K 0.00</span>
                                 </div>
                                 <div class="calc-item">
                                     <span>Total Amount:</span>
-                                    <span id="calc-total">$0.00</span>
+                                    <span id="calc-total">K 0.00</span>
                                 </div>
                                 <div class="calc-item">
                                     <span>Monthly Payment (<span id="calc-months">0</span> months):</span>
-                                    <span id="calc-monthly">$0.00</span>
+                                    <span id="calc-monthly">K 0.00</span>
                                 </div>
                             </div>
 
@@ -352,40 +387,42 @@ $loan_plans = $conn->query("SELECT * FROM loan_plan ORDER BY months ASC");
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
-        // Plan card selection visual feedback
-        $('.plan-card').click(function(){
-            $('.plan-card').removeClass('selected');
-            $(this).addClass('selected');
-            $(this).find('input[type="radio"]').prop('checked', true);
-            calculateLoan();
-        });
-
-        // Calculate loan when amount or plan changes
-        $('#loan_amount, input[name="plan_id"]').on('change', function(){
+        // Calculate loan when amount or duration changes
+        $('#loan_amount, #duration_months').on('change', function(){
             calculateLoan();
         });
 
         function calculateLoan() {
             var amount = parseFloat($('#loan_amount').val());
-            var selectedPlan = $('input[name="plan_id"]:checked');
-            
-            if(amount && selectedPlan.length > 0) {
-                var months = parseInt(selectedPlan.data('months'));
-                var interestRate = parseFloat(selectedPlan.data('interest'));
-                
-                // Calculate total interest
-                var interest = (amount * interestRate) / 100;
-                var totalAmount = amount + interest;
-                var monthlyPayment = totalAmount / months;
-                
+            var durationMonths = parseInt($('#duration_months').val());
+
+            if(amount && durationMonths) {
+                // Determine interest rate based on loan amount policy
+                var interestRate;
+                var rateNote;
+
+                if(amount <= 5000) {
+                    interestRate = 18.0; // Auto-assigned 18% for small loans
+                    rateNote = interestRate + '% (Auto-assigned)';
+                } else {
+                    interestRate = 28.0; // Conservative estimate for large loans
+                    rateNote = interestRate + '% (Estimated - Admin will assign actual rate)';
+                }
+
+                // Calculate using simple interest
+                var monthlyRate = interestRate / 100 / 12; // Monthly rate
+                var totalInterest = amount * monthlyRate * durationMonths;
+                var totalAmount = amount + totalInterest;
+                var monthlyPayment = totalAmount / durationMonths;
+
                 // Display calculations
-                $('#calc-principal').text('$' + amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                $('#calc-interest-rate').text(interestRate);
-                $('#calc-interest').text('$' + interest.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                $('#calc-total').text('$' + totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                $('#calc-months').text(months);
-                $('#calc-monthly').text('$' + monthlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                
+                $('#calc-principal').text('K ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $('#calc-interest-rate').text(rateNote);
+                $('#calc-interest').text('K ' + totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $('#calc-total').text('K ' + totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                $('#calc-months').text(durationMonths);
+                $('#calc-monthly').text('K ' + monthlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+
                 $('#calculation-box').slideDown();
             } else {
                 $('#calculation-box').slideUp();

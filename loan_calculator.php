@@ -32,7 +32,9 @@ require_once 'config/constants.php'; ?>
 
 						<!-- Amount -->
 						<div class="form-group">
-						<label>Loan Amount (<?php echo AppConfig::CURRENCY_SYMBOL ?>)</label>
+							<label>Loan Amount (<?php echo AppConfig::CURRENCY_SYMBOL ?>)</label>
+							<input type="number" class="form-control form-control-lg" id="amount" value="1000" min="1" step="any">
+						</div>
 
 						<!-- Interest Rate -->
 						<div class="form-group">
@@ -317,9 +319,18 @@ function calculateSimple(amount, rate) {
 // Compound Interest Calculation
 function calculateCompound(amount, rate, months) {
 	const monthlyRate = rate / 100 / 12;
-	const totalInterest = amount * (rate / 100);
-	const total = amount + totalInterest;
-	const monthly = total / months;
+
+	// Correct compound interest formula: A = P(1 + r)^n
+	const total = amount * Math.pow(1 + monthlyRate, months);
+	const totalInterest = total - amount;
+
+	// Calculate monthly payment using amortization formula
+	let monthly;
+	if (monthlyRate > 0) {
+		monthly = amount * monthlyRate * Math.pow(1 + monthlyRate, months) / (Math.pow(1 + monthlyRate, months) - 1);
+	} else {
+		monthly = amount / months;
+	}
 
 	$('#simple_results').hide();
 	$('#compound_results').show();

@@ -76,10 +76,12 @@
 <script>
 	$('#borrower-list').dataTable()
 	$('#new_borrower').click(function(){
-		uni_modal("New borrower","manage_borrower.php",'mid-large')
+		// Use modern slide-over instead of modal
+		slide_over("New Borrower", "manage_borrower.php", 'large')
 	})
 	$('.edit_borrower').click(function(){
-		uni_modal("Edit borrower","manage_borrower.php?id="+$(this).attr('data-id'),'mid-large')
+		// Use modern slide-over instead of modal
+		slide_over("Edit Borrower", "manage_borrower.php?id=" + $(this).attr('data-id'), 'large')
 	})
 	$('.delete_borrower').click(function(){
 		_conf("Are you sure to delete this borrower?","delete_borrower",[$(this).attr('data-id')])

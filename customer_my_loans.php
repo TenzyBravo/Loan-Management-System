@@ -10,14 +10,16 @@ include('db_connect.php');
 $customer_id = $_SESSION['customer_id'];
 
 // Get all loans for this customer (simplified - no payment details exposed)
-$loans_query = "SELECT l.*, lt.type_name, lp.months, lp.interest_percentage
+$stmt = $conn->prepare("SELECT l.*, lt.type_name, lp.months, lp.interest_percentage
                 FROM loan_list l
                 LEFT JOIN loan_types lt ON l.loan_type_id = lt.id
                 LEFT JOIN loan_plan lp ON l.plan_id = lp.id
-                WHERE l.borrower_id = $customer_id
-                ORDER BY l.date_created DESC";
-
-$loans_result = $conn->query($loans_query);
+                WHERE l.borrower_id = ?
+                ORDER BY l.date_created DESC");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$loans_result = $stmt->get_result();
+$stmt->close();
 ?>
 
 <!DOCTYPE html>

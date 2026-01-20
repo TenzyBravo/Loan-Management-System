@@ -1,29 +1,74 @@
 <?php include 'db_connect.php' ?>
-<?php 
+<?php
 //extract($_POST);
-if(isset($id)){
-	$qry = $conn->query("SELECT * FROM payments where id=".$_POST['id']);
-	foreach($qry->fetch_array() as $k => $val){
-		$$k = $val;
+$id = $_POST['id'] ?? null;
+$loan_id = $_POST['loan_id'] ?? null;
+
+if($id){
+	$stmt = $conn->prepare("SELECT * FROM payments where id = ?");
+	$stmt->bind_param("i", $id);
+	$stmt->execute();
+	$qry = $stmt->get_result();
+	if($qry->num_rows > 0) {
+		foreach($qry->fetch_array() as $k => $val){
+			$$k = $val;
+		}
 	}
+	$stmt->close();
 }
-$loan = $conn->query("SELECT l.*,concat(b.lastname,', ',b.firstname,' ',b.middlename)as name, b.contact_no, b.address from loan_list l inner join borrowers b on b.id = l.borrower_id where l.id = ".$_POST['loan_id']);
+
+$stmt = $conn->prepare("SELECT l.*,concat(b.lastname,', ',b.firstname,' ',b.middlename)as name, b.contact_no, b.address from loan_list l inner join borrowers b on b.id = l.borrower_id where l.id = ?");
+$stmt->bind_param("i", $loan_id);
+$stmt->execute();
+$loan = $stmt->get_result();
 foreach($loan->fetch_array() as $k => $v){
 	$meta[$k] = $v;
 }
-$type_arr = $conn->query("SELECT * FROM loan_types where id = '".$meta['loan_type_id']."' ")->fetch_array();
+$stmt->close();
 
-$plan_arr = $conn->query("SELECT *,concat(months,' month/s [ ',interest_percentage,'%, ',penalty_rate,' ]') as plan FROM loan_plan where id  = '".$meta['plan_id']."' ")->fetch_array();
-$monthly = ($meta['amount'] + ($meta['amount'] * ($plan_arr['interest_percentage']/100))) / $plan_arr['months'];
+$stmt = $conn->prepare("SELECT * FROM loan_types where id = ?");
+$stmt->bind_param("i", $meta['loan_type_id']);
+$stmt->execute();
+$type_arr = $stmt->fetch_array();
+$stmt->close();
+
+$stmt = $conn->prepare("SELECT *,concat(months,' month/s [ ',interest_percentage,'%, ',penalty_rate,' ]') as plan FROM loan_plan where id = ?");
+$stmt->bind_param("i", $meta['plan_id']);
+$stmt->execute();
+$plan_arr = $stmt->fetch_array();
+$stmt->close();
+
+// Calculate monthly payment correctly using annual interest rate
+$annual_rate = $plan_arr['interest_percentage'];
+$months = $plan_arr['months'];
+$monthly_rate = $annual_rate / 12 / 100; // Convert annual to monthly rate
+
+// Simple interest calculation (consistent with finance.php)
+$total_interest = $meta['amount'] * $monthly_rate * $months;
+$total_payable = $meta['amount'] + $total_interest;
+$monthly = $total_payable / $months;
+
 $penalty = $monthly * ($plan_arr['penalty_rate']/100);
-$payments = $conn->query("SELECT * from payments where loan_id =".$_POST['loan_id']);
+
+$stmt = $conn->prepare("SELECT * from payments where loan_id = ?");
+$stmt->bind_param("i", $loan_id);
+$stmt->execute();
+$payments = $stmt->get_result();
 $paid = $payments->num_rows;
-$offset = $paid > 0 ? " offset $paid ": "";
-	$next = $conn->query("SELECT * FROM loan_schedules where loan_id = '".$_POST['loan_id']."'  order by date(date_due) asc limit 1 $offset ")->fetch_assoc()['date_due'];
+
+// Get next schedule date
+$stmt2 = $conn->prepare("SELECT * FROM loan_schedules where loan_id = ? order by date(date_due) asc limit 1 offset ?");
+$offset = $paid > 0 ? $paid : 0;
+$stmt2->bind_param("ii", $loan_id, $offset);
+$stmt2->execute();
+$next = $stmt2->get_result()->fetch_assoc()['date_due'];
+$stmt2->close();
+
 $sum_paid = 0;
 while($p = $payments->fetch_assoc()){
 	$sum_paid += ($p['amount'] - $p['penalty_amount']);
 }
+$stmt->close();
 
 ?>
 <div class="col-lg-12">

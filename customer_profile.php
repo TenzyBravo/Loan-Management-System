@@ -8,8 +8,17 @@ if(!isset($_SESSION['customer_id'])){
 include('db_connect.php');
 
 $customer_id = $_SESSION['customer_id'];
-$customer = $conn->query("SELECT * FROM borrowers WHERE id = $customer_id")->fetch_assoc();
-$documents = $conn->query("SELECT * FROM borrower_documents WHERE borrower_id = $customer_id");
+$stmt = $conn->prepare("SELECT * FROM borrowers WHERE id = ?");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$customer = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+$stmt = $conn->prepare("SELECT * FROM borrower_documents WHERE borrower_id = ?");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$documents = $stmt->get_result();
+$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">

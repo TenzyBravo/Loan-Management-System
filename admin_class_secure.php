@@ -74,20 +74,20 @@ class SecureAction {
             if ($passwordValid) {
                 // Clear rate limit on successful login
                 Security::clearRateLimit($ipKey);
-                
-                // Regenerate session ID to prevent fixation
-                Security::regenerateSession();
-                
-                // Set session variables
+
+                // Set session variables FIRST before regeneration
                 foreach ($user as $key => $value) {
                     if ($key !== 'password' && !is_numeric($key)) {
                         $_SESSION['login_' . $key] = $value;
                     }
                 }
-                
+
+                // Regenerate session ID to prevent fixation (after setting session data)
+                Security::regenerateSession();
+
                 // Log successful login
                 Security::logSecurityEvent('login_success', ['user_id' => $user['id'], 'username' => $username], $this->conn);
-                
+
                 $stmt->close();
                 return 1; // Success
             }
@@ -371,10 +371,15 @@ class SecureAction {
             $calc = calculateLoan($loan_amount, $interest_rate ?: 18.0, $duration_months, $calculation_type);
         } catch(Exception $e) {
             // Fallback to simple calculation to avoid blocking save
+            // Correctly convert annual interest rate to monthly
+            $monthly_rate = $interest_rate / 12 / 100;
+            $total_interest = $loan_amount * $monthly_rate * $duration_months;
+            $total_payable = $loan_amount + $total_interest;
+
             $calc = [
-                'total_interest' => round($loan_amount * ($interest_rate / 100) * $duration_months, 2),
-                'total_payable' => round($loan_amount + ($loan_amount * ($interest_rate / 100) * $duration_months), 2),
-                'monthly_installment' => round(($loan_amount + ($loan_amount * ($interest_rate / 100) * $duration_months)) / $duration_months, 2)
+                'total_interest' => round($total_interest, 2),
+                'total_payable' => round($total_payable, 2),
+                'monthly_installment' => round($total_payable / $duration_months, 2)
             ];
             $calc['interest_rate'] = $interest_rate;
             $calc['calculation_type'] = $calculation_type;
@@ -583,5 +588,411 @@ class SecureAction {
         
         $stmt->close();
         return json_encode(['status' => 'error', 'message' => 'Failed to change password']);
+    }
+
+    /**
+     * Get loan review details
+     */
+    public function get_loan_review_details() {
+        $loan_id = Security::sanitizeInt($_POST['loan_id'] ?? 0);
+
+        // Get loan details
+        $stmt = $this->conn->prepare("SELECT l.*, CONCAT(b.firstname, ' ', b.middlename, ' ', b.lastname) as customer_name,
+                                  b.email, b.contact_no, b.address, b.tax_id,
+                                  lt.type_name, lt.description as type_desc,
+                                  lp.months, lp.interest_percentage, lp.penalty_rate,
+                                  u.name as reviewed_by_name
+                                  FROM loan_list l
+                                  INNER JOIN borrowers b ON l.borrower_id = b.id
+                                  LEFT JOIN loan_types lt ON l.loan_type_id = lt.id
+                                  LEFT JOIN loan_plan lp ON l.plan_id = lp.id
+                                  LEFT JOIN users u ON l.reviewed_by = u.id
+                                  WHERE l.id = ?");
+        $stmt->bind_param("i", $loan_id);
+        $stmt->execute();
+        $loan = $stmt->get_result()->fetch_array();
+        $stmt->close();
+
+        // Get documents
+        $stmt = $this->conn->prepare("SELECT * FROM borrower_documents WHERE borrower_id = ?");
+        $stmt->bind_param("i", $loan['borrower_id']);
+        $stmt->execute();
+        $documents = $stmt->get_result();
+        $stmt->close();
+
+        // Get checklist
+        $stmt = $this->conn->prepare("SELECT * FROM loan_application_checklist WHERE loan_id = ?");
+        $stmt->bind_param("i", $loan_id);
+        $stmt->execute();
+        $checklist = $stmt->get_result();
+        $stmt->close();
+
+        // Calculate loan details
+        $principal = $loan['amount'];
+        $interest = ($principal * $loan['interest_percentage']) / 100;
+        $total = $principal + $interest;
+        $monthly = $total / $loan['months'];
+
+        $status_badges = array(
+            0 => '<span class="badge badge-secondary">Draft</span>',
+            1 => '<span class="badge badge-warning">Submitted</span>',
+            2 => '<span class="badge badge-info">Under Review</span>',
+            3 => '<span class="badge badge-success">Approved</span>',
+            4 => '<span class="badge badge-danger">Denied</span>'
+        );
+
+        $doc_type_labels = array(
+            'id' => 'Government ID',
+            'employment_proof' => 'Employment Proof',
+            'payslip' => 'Pay Slip'
+        );
+
+        ob_start();
+        ?>
+
+        <div class="row">
+            <!-- Left Column -->
+            <div class="col-md-8">
+
+                <!-- Application Status -->
+                <div class="info-section">
+                    <h6><i class="fa fa-info-circle"></i> Application Status</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <label>Reference Number:</label>
+                                <p><b><?php echo $loan['ref_no'] ?></b></p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <label>Current Status:</label>
+                                <p><?php echo $status_badges[$loan['application_status']] ?></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Information -->
+                <div class="info-section">
+                    <h6><i class="fa fa-user"></i> Customer Information</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <label>Full Name:</label>
+                                <p><?php echo $loan['customer_name'] ?></p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <label>Email:</label>
+                                <p><?php echo $loan['email'] ?></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loan Details -->
+                <div class="info-section">
+                    <h6><i class="fa fa-money-bill-wave"></i> Loan Details</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <label>Loan Type:</label>
+                                <p><b><?php echo $loan['type_name'] ?></b></p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-item">
+                                <label>Amount:</label>
+                                <p><b>K <?php echo number_format($principal, 2) ?></b></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calculation -->
+                <div class="info-section" style="background: #fff3e0;">
+                    <h6><i class="fa fa-calculator"></i> Payment Plan</h6>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="info-item">
+                                <label>Principal:</label>
+                                <p>K <?php echo number_format($principal, 2) ?></p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-item">
+                                <label>Interest:</label>
+                                <p>K <?php echo number_format($interest, 2) ?></p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-item">
+                                <label>Total:</label>
+                                <p><b>K <?php echo number_format($total, 2) ?></b></p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="info-item">
+                                <label>Monthly:</label>
+                                <p><b>K <?php echo number_format($monthly, 2) ?></b></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column - Checklist -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="fa fa-tasks"></i> Review Checklist</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <?php while($item = $checklist->fetch_assoc()): ?>
+                        <div class="checklist-item">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox"
+                                       class="custom-control-input checklist-checkbox"
+                                       id="check_<?php echo $item['id'] ?>"
+                                       data-id="<?php echo $item['id'] ?>"
+                                       <?php echo $item['checked'] ? 'checked' : '' ?>>
+                                <label class="custom-control-label" for="check_<?php echo $item['id'] ?>">
+                                    <?php echo $item['item'] ?>
+                                </label>
+                            </div>
+                        </div>
+                        <?php endwhile; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <div class="text-right">
+                <?php if($loan['application_status'] == 1): ?>
+                    <button class="btn btn-info update-status-btn"
+                            data-loan-id="<?php echo $loan_id ?>"
+                            data-status="2"
+                            data-status-text="Move to Under Review">
+                        <i class="fa fa-search"></i> Move to Under Review
+                    </button>
+                <?php endif; ?>
+
+                <?php if($loan['application_status'] <= 2): ?>
+                    <button class="btn btn-success update-status-btn"
+                            data-loan-id="<?php echo $loan_id ?>"
+                            data-status="3"
+                            data-status-text="Approve">
+                        <i class="fa fa-check"></i> Approve Application
+                    </button>
+                    <button class="btn btn-danger update-status-btn"
+                            data-loan-id="<?php echo $loan_id ?>"
+                            data-status="4"
+                            data-status-text="Deny">
+                        <i class="fa fa-times"></i> Deny Application
+                    </button>
+                <?php endif; ?>
+
+                <button class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fa fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Update document status
+     */
+    public function update_document_status() {
+        $id = Security::sanitizeInt($_POST['id'] ?? 0);
+        $status = Security::sanitizeInt($_POST['status'] ?? 0);
+
+        // Validate status (should be 0 for pending, 1 for verified, 2 for rejected)
+        if (!in_array($status, [0, 1, 2])) {
+            return json_encode(['status' => 'error', 'message' => 'Invalid status value']);
+        }
+
+        $stmt = $this->conn->prepare("UPDATE borrower_documents SET status = ?, verification_date = NOW() WHERE id = ?");
+        $stmt->bind_param("ii", $status, $id);
+
+        if ($stmt->execute()) {
+            $stmt->close();
+
+            // Get document info for notification
+            $stmt = $this->conn->prepare("SELECT borrower_id, document_type FROM borrower_documents WHERE id = ?");
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            $doc = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if ($doc) {
+                $borrower_id = $doc['borrower_id'];
+                $doc_type = $doc['document_type'];
+
+                $doc_type_labels = array(
+                    'id' => 'Government ID',
+                    'employment_proof' => 'Employment Proof',
+                    'payslip' => 'Pay Slip'
+                );
+
+                $type_label = $doc_type_labels[$doc_type] ?? ucfirst(str_replace('_', ' ', $doc_type));
+
+                if ($status == 1) {
+                    $title = "Document Verified";
+                    $message = "Your $type_label has been verified successfully.";
+                    $type = "success";
+                } else {
+                    $title = "Document Status Updated";
+                    $message = "Your $type_label status has been updated.";
+                    $type = "info";
+                }
+
+                // Insert notification for customer
+                $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
+                $stmt->bind_param("isss", $borrower_id, $title, $message, $type);
+                $stmt->execute();
+                $stmt->close();
+            }
+
+            return 1;
+        }
+
+        $stmt->close();
+        return json_encode(['status' => 'error', 'message' => 'Failed to update document status']);
+    }
+
+    /**
+     * Approve loan application
+     */
+    public function approve_loan_application() {
+        $loan_id = Security::sanitizeInt($_POST['loan_id'] ?? 0);
+        $interest_rate = Security::sanitizeFloat($_POST['interest_rate'] ?? 0);
+
+        if($loan_id == 0 || $interest_rate == 0) {
+            return json_encode(['status' => 'error', 'message' => 'Invalid loan ID or interest rate']);
+        }
+
+        // Get loan details
+        $stmt = $this->conn->prepare("SELECT * FROM loan_list WHERE id = ?");
+        $stmt->bind_param("i", $loan_id);
+        $stmt->execute();
+        $loan = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if(!$loan) {
+            return json_encode(['status' => 'error', 'message' => 'Loan not found']);
+        }
+
+        // Recalculate loan with assigned interest rate
+        try {
+            $duration_months = $loan['duration_months'] ?? 1;
+            $calculation_type = $loan['calculation_type'] ?? 'simple';
+
+            $calc = calculateLoan($loan['amount'], $interest_rate, $duration_months, $calculation_type);
+
+            $total_interest = $calc['total_interest'];
+            $total_payable = $calc['total_payable'];
+            $monthly_installment = $calc['monthly_installment'];
+            $outstanding_balance = $total_payable;
+
+            // Update loan with approved status and recalculated values
+            $stmt = $this->conn->prepare("UPDATE loan_list SET
+                status = 1,
+                interest_rate = ?,
+                total_interest = ?,
+                total_payable = ?,
+                monthly_installment = ?,
+                outstanding_balance = ?
+                WHERE id = ?
+            ");
+            $stmt->bind_param("dddddi",
+                $interest_rate,
+                $total_interest,
+                $total_payable,
+                $monthly_installment,
+                $outstanding_balance,
+                $loan_id
+            );
+
+            if(!$stmt->execute()) {
+                $stmt->close();
+                return json_encode(['status' => 'error', 'message' => 'Database update failed']);
+            }
+            $stmt->close();
+
+            // Create notification for customer
+            $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type)
+                VALUES (?, 'Loan Approved', 'Your loan application (Ref: ?) has been approved with ?% interest rate. Total amount payable: ? over ? months.', 'success')");
+            $ref_no = $loan['ref_no'];
+            $formatted_total = formatCurrency($total_payable);
+            $stmt->bind_param("isssi",
+                $loan['borrower_id'],
+                $ref_no,
+                $interest_rate,
+                $formatted_total,
+                $duration_months
+            );
+            $stmt->execute();
+            $stmt->close();
+
+            return 1; // Success
+
+        } catch(Exception $e) {
+            return json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Deny loan application
+     */
+    public function deny_loan_application() {
+        $loan_id = Security::sanitizeInt($_POST['loan_id'] ?? 0);
+        $denial_reason = Security::sanitizeString($_POST['denial_reason'] ?? 'Not specified');
+
+        if($loan_id == 0) {
+            return json_encode(['status' => 'error', 'message' => 'Invalid loan ID']);
+        }
+
+        // Get loan details
+        $stmt = $this->conn->prepare("SELECT * FROM loan_list WHERE id = ?");
+        $stmt->bind_param("i", $loan_id);
+        $stmt->execute();
+        $loan = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if(!$loan) {
+            return json_encode(['status' => 'error', 'message' => 'Loan not found']);
+        }
+
+        // Update loan status to denied
+        $stmt = $this->conn->prepare("UPDATE loan_list SET status = 4 WHERE id = ?");
+        $stmt->bind_param("i", $loan_id);
+
+        if(!$stmt->execute()) {
+            $stmt->close();
+            return json_encode(['status' => 'error', 'message' => 'Database update failed']);
+        }
+        $stmt->close();
+
+        // Create notification for customer
+        $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type)
+            VALUES (?, 'Loan Application Denied', 'Your loan application (Ref: ?) has been denied. Reason: ?', 'danger')");
+        $ref_no = $loan['ref_no'];
+        $stmt->bind_param("iss",
+            $loan['borrower_id'],
+            $ref_no,
+            $denial_reason
+        );
+        $stmt->execute();
+        $stmt->close();
+
+        return 1; // Success
     }
 }
