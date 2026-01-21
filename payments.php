@@ -17,15 +17,18 @@ $loans_query = $conn->query("
         lp.months,
         lp.penalty_rate,
         (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE loan_id = l.id) as total_paid,
-        (SELECT COUNT(*) FROM payments WHERE loan_id = l.id) as payments_made,
-        (SELECT MIN(date_due) FROM loan_schedules WHERE loan_id = l.id AND date_due >= CURDATE()
-         AND id NOT IN (SELECT schedule_id FROM payments WHERE schedule_id IS NOT NULL)) as next_due_date
+        (SELECT COUNT(*) FROM payments WHERE loan_id = l.id) as payments_made
     FROM loan_list l
     INNER JOIN borrowers b ON l.borrower_id = b.id
     LEFT JOIN loan_plan lp ON l.plan_id = lp.id
     WHERE l.status = 2
     ORDER BY l.date_created DESC
 ");
+
+// Check for query error
+if(!$loans_query) {
+    die("Query error: " . $conn->error);
+}
 
 // Get today for overdue check
 $today = date('Y-m-d');
@@ -259,21 +262,38 @@ $today = date('Y-m-d');
     $loans_data = [];
     while($loan = $loans_query->fetch_assoc()) {
         $total_loans++;
-        $remaining = $loan['total_payable'] - $loan['total_paid'];
+        $remaining = ($loan['total_payable'] ?? 0) - ($loan['total_paid'] ?? 0);
         $total_receivable += $remaining;
-        $total_collected += $loan['total_paid'];
+        $total_collected += ($loan['total_paid'] ?? 0);
 
-        // Check if overdue
+        // Try to get next due date from loan_schedules
+        $next_due_date = null;
+        $schedule_check = $conn->query("SELECT MIN(date_due) as next_due FROM loan_schedules WHERE loan_id = " . intval($loan['loan_id']) . " AND date_due >= CURDATE()");
+        if($schedule_check && $schedule_row = $schedule_check->fetch_assoc()) {
+            $next_due_date = $schedule_row['next_due'];
+        }
+
+        // Check if overdue based on date_released + payments made
         $is_overdue = false;
-        if($loan['next_due_date'] && $loan['next_due_date'] < $today) {
+        if($next_due_date && $next_due_date < $today) {
             $is_overdue = true;
             $overdue_count++;
+        } elseif(!$next_due_date && $loan['date_released']) {
+            // Fallback: check if any payment is due based on release date
+            $months_since_release = floor((strtotime($today) - strtotime($loan['date_released'])) / (30 * 24 * 60 * 60));
+            if($months_since_release > $loan['payments_made']) {
+                $is_overdue = true;
+                $overdue_count++;
+            } else {
+                $current_count++;
+            }
         } else {
             $current_count++;
         }
 
         $loan['is_overdue'] = $is_overdue;
         $loan['remaining'] = $remaining;
+        $loan['next_due_date'] = $next_due_date;
         $loans_data[] = $loan;
     }
     ?>
