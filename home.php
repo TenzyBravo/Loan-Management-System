@@ -463,7 +463,7 @@ $stmt->close();
                     </div>
                 </div>
                 <div class="card-footer bg-primary border-0 py-2">
-                    <a href="index.php?page=payments" class="text-white text-decoration-none small">
+                    <a href="admin.php?page=payments" class="text-white text-decoration-none small">
                         View all payments <i class="fa fa-arrow-right ml-1"></i>
                     </a>
                 </div>
@@ -520,7 +520,7 @@ $stmt->close();
                     </div>
                 </div>
                 <div class="card-footer bg-warning border-0 py-2">
-                    <a href="index.php?page=loans" class="text-dark text-decoration-none small">
+                    <a href="admin.php?page=loans" class="text-dark text-decoration-none small">
                         Review pending <i class="fa fa-arrow-right ml-1"></i>
                     </a>
                 </div>
@@ -747,7 +747,7 @@ $stmt->close();
             <div class="card h-100">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h6 class="section-title mb-0"><i class="fa fa-history"></i> Recent Activity</h6>
-                    <a href="index.php?page=loans" class="btn btn-sm btn-outline-primary">View All</a>
+                    <a href="admin.php?page=loans" class="btn btn-sm btn-outline-primary">View All</a>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
@@ -850,7 +850,7 @@ $stmt->close();
             <div class="card">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h6 class="section-title mb-0"><i class="fa fa-money-bill-wave"></i> Recent Payments</h6>
-                    <a href="index.php?page=payments" class="btn btn-sm btn-outline-success">View All Payments</a>
+                    <a href="admin.php?page=payments" class="btn btn-sm btn-outline-success">View All Payments</a>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">

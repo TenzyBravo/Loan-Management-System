@@ -41,8 +41,12 @@ $documents = $stmt->get_result();
 $stmt->close();
 
 // Determine if interest rate needs to be set
-$needs_rate_assignment = ($loan['amount'] > 5000 && ($loan['interest_rate'] ?? 0) == 0);
-$auto_assigned_rate = ($loan['amount'] <= 5000 && ($loan['interest_rate'] ?? 0) == 18);
+// BUSINESS RULE: 1-month loans = 18% TOTAL (auto-assigned)
+//                Multi-month loans = Admin must assign rate
+$duration_months = $loan['duration_months'] ?? 1;
+$is_one_month_loan = ($duration_months == 1);
+$needs_rate_assignment = (!$is_one_month_loan && ($loan['interest_rate'] ?? 0) == 0);
+$auto_assigned_rate = $is_one_month_loan; // 1-month loans always auto-assigned 18%
 ?>
 
 <style>
@@ -146,12 +150,14 @@ $auto_assigned_rate = ($loan['amount'] <= 5000 && ($loan['interest_rate'] ?? 0) 
                 <?php if($auto_assigned_rate): ?>
                     <div class="alert alert-success">
                         <i class="fa fa-check-circle"></i>
-                        <strong>Auto-Assigned Rate:</strong> 18% (Loan amount ≤ K5,000)
+                        <strong>Auto-Assigned Rate:</strong> 18% TOTAL interest (1-month loan)
+                        <br><small>This is applied to the full loan amount, not as an annual rate.</small>
                     </div>
                 <?php elseif($needs_rate_assignment): ?>
                     <div class="alert alert-warning">
                         <i class="fa fa-exclamation-triangle"></i>
-                        <strong>Action Required:</strong> This loan requires manual interest rate assignment (Amount > K5,000)
+                        <strong>Action Required:</strong> This loan requires manual interest rate assignment (<?php echo $duration_months ?>-month loan)
+                        <br><small>Multi-month loans require administrator to set an annual interest rate.</small>
                     </div>
                     <div class="form-group">
                         <label>Assign Interest Rate</label>
@@ -353,13 +359,14 @@ $('#assign_interest_rate').change(function() {
         const amount = <?php echo $loan['amount'] ?>;
         const months = <?php echo $loan['duration_months'] ?? 1 ?>;
 
-        // Calculate using simple interest
+        // For multi-month loans: treat rate as ANNUAL rate
+        // Calculate using simple interest: Principal × (Annual Rate / 12) × Months
         const monthlyRate = rate / 100 / 12;
         const totalInterest = amount * monthlyRate * months;
         const totalPayable = amount + totalInterest;
         const monthlyPayment = totalPayable / months;
 
-        $('#preview-rate').text(rate + '%');
+        $('#preview-rate').text(rate + '% (annual)');
         $('#preview-interest').text('K ' + totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2}));
         $('#preview-total').text('K ' + totalPayable.toLocaleString('en-US', {minimumFractionDigits: 2}));
         $('#preview-monthly').text('K ' + monthlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2}));
@@ -371,6 +378,26 @@ $('#assign_interest_rate').change(function() {
         $('#calculation-preview').slideUp();
         $('#approve-btn').prop('disabled', true);
     }
+});
+<?php endif; ?>
+
+<?php if($auto_assigned_rate): ?>
+// Show calculation preview for 1-month loans (auto 18%)
+$(document).ready(function() {
+    const amount = <?php echo $loan['amount'] ?>;
+    const rate = 18;
+
+    // For 1-month loans: 18% is TOTAL interest, not annual
+    const totalInterest = amount * (rate / 100);
+    const totalPayable = amount + totalInterest;
+
+    $('#preview-rate').text(rate + '% (total)');
+    $('#preview-interest').text('K ' + totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2}));
+    $('#preview-total').text('K ' + totalPayable.toLocaleString('en-US', {minimumFractionDigits: 2}));
+    $('#preview-monthly').text('K ' + totalPayable.toLocaleString('en-US', {minimumFractionDigits: 2}));
+
+    $('#calculation-preview').show();
+    $('#final_interest_rate').val(18);
 });
 <?php endif; ?>
 
