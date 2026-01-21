@@ -214,26 +214,25 @@ if(isset($_GET['id'])){
 
 			<div class="row">
 				<div class="col-md-6 form-group">
-					<label class="control-label">Annual Interest Rate <span class="text-danger">*</span></label>
+					<label class="control-label">Total Interest Rate <span class="text-danger">*</span></label>
 					<select name="interest_rate" id="interest_rate" class="custom-select browser-default" required>
 						<option value="0" <?php echo (!isset($interest_rate) || $interest_rate == 0) ? "selected" : '' ?>>Not Set (Pending Review)</option>
-						<option value="10.0" <?php echo isset($interest_rate) && $interest_rate == 10.0 ? "selected" : '' ?>>10% - Low Risk</option>
-						<option value="18.0" <?php echo isset($interest_rate) && $interest_rate == 18.0 ? "selected" : '' ?>>18% - Standard (Auto for ≤K5,000)</option>
-						<option value="25.0" <?php echo isset($interest_rate) && $interest_rate == 25.0 ? "selected" : '' ?>>25% - Moderate Risk</option>
-						<option value="28.0" <?php echo isset($interest_rate) && $interest_rate == 28.0 ? "selected" : '' ?>>28% - Medium Risk</option>
-						<option value="30.0" <?php echo isset($interest_rate) && $interest_rate == 30.0 ? "selected" : '' ?>>30% - Higher Risk</option>
-						<option value="35.0" <?php echo isset($interest_rate) && $interest_rate == 35.0 ? "selected" : '' ?>>35% - High Risk</option>
-						<option value="40.0" <?php echo isset($interest_rate) && $interest_rate == 40.0 ? "selected" : '' ?>>40% - Very High Risk</option>
+						<option value="10.0" <?php echo isset($interest_rate) && $interest_rate == 10.0 ? "selected" : '' ?>>10% Total - Low Risk</option>
+						<option value="18.0" <?php echo isset($interest_rate) && $interest_rate == 18.0 ? "selected" : '' ?>>18% Total - Standard (Auto for 1-month)</option>
+						<option value="25.0" <?php echo isset($interest_rate) && $interest_rate == 25.0 ? "selected" : '' ?>>25% Total - Moderate Risk</option>
+						<option value="28.0" <?php echo isset($interest_rate) && $interest_rate == 28.0 ? "selected" : '' ?>>28% Total - Medium Risk</option>
+						<option value="30.0" <?php echo isset($interest_rate) && $interest_rate == 30.0 ? "selected" : '' ?>>30% Total - Higher Risk</option>
+						<option value="35.0" <?php echo isset($interest_rate) && $interest_rate == 35.0 ? "selected" : '' ?>>35% Total - High Risk</option>
+						<option value="40.0" <?php echo isset($interest_rate) && $interest_rate == 40.0 ? "selected" : '' ?>>40% Total - Very High Risk</option>
 					</select>
 				</div>
 
-				<div class="col-md-6 form-group">
+				<div class="col-md-6 form-group" style="display:none;">
 					<label class="control-label">Calculation Type</label>
 					<select name="calculation_type" id="calculation_type" class="custom-select browser-default">
-						<option value="simple" <?php echo (isset($calculation_type) && $calculation_type == 'simple') ? "selected" : '' ?>>Simple Interest</option>
-						<option value="compound" <?php echo (isset($calculation_type) && $calculation_type == 'compound') ? "selected" : '' ?>>Compound Interest</option>
+						<option value="simple" selected>Simple Interest</option>
 					</select>
-					<small class="text-muted">Simple interest is recommended for most loans</small>
+					<small class="text-muted">All loans use simple total interest</small>
 				</div>
 			</div>
 
@@ -333,16 +332,17 @@ if(isset($_GET['id'])){
 	// BUSINESS RULE: Auto-set 18% for 1-month loans
 	function checkDurationAndSetRate() {
 		var duration = parseInt($('#duration_months').val());
+		$('#auto-rate-notice').remove();
 
 		if(duration === 1) {
-			// 1-month loan: automatically set to 18%
+			// 1-month loan: automatically set to 18% TOTAL
 			$('#interest_rate').val('18.0');
 			$('#interest_rate').prop('disabled', true);
-			$('#interest_rate').after('<small class="text-success d-block mt-1" id="auto-rate-notice"><i class="fa fa-check-circle"></i> Auto-set: 1-month loans = 18%</small>');
+			$('#interest_rate').after('<small class="text-success d-block mt-1" id="auto-rate-notice"><i class="fa fa-check-circle"></i> Auto-set: 1-month loans = 18% total interest</small>');
 		} else {
-			// Multi-month loan: admin must select rate
+			// Multi-month loan: admin must select rate (also TOTAL interest)
 			$('#interest_rate').prop('disabled', false);
-			$('#auto-rate-notice').remove();
+			$('#interest_rate').after('<small class="text-info d-block mt-1" id="auto-rate-notice"><i class="fa fa-info-circle"></i> Select total interest rate for this loan</small>');
 		}
 	}
 

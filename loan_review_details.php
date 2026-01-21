@@ -156,18 +156,20 @@ $auto_assigned_rate = $is_one_month_loan; // 1-month loans always auto-assigned 
                 <?php elseif($needs_rate_assignment): ?>
                     <div class="alert alert-warning">
                         <i class="fa fa-exclamation-triangle"></i>
-                        <strong>Action Required:</strong> This loan requires manual interest rate assignment (<?php echo $duration_months ?>-month loan)
-                        <br><small>Multi-month loans require administrator to set an annual interest rate.</small>
+                        <strong>Action Required:</strong> This loan requires interest rate assignment (<?php echo $duration_months ?>-month loan)
+                        <br><small>Select the total interest rate to apply to this loan.</small>
                     </div>
                     <div class="form-group">
-                        <label>Assign Interest Rate</label>
+                        <label>Assign Total Interest Rate</label>
                         <select id="assign_interest_rate" class="form-control">
                             <option value="">Select Interest Rate</option>
-                            <option value="25.0">25%</option>
-                            <option value="28.0">28%</option>
-                            <option value="30.0">30%</option>
-                            <option value="35.0">35%</option>
-                            <option value="40.0">40%</option>
+                            <option value="10.0">10% Total Interest</option>
+                            <option value="18.0">18% Total Interest</option>
+                            <option value="25.0">25% Total Interest</option>
+                            <option value="28.0">28% Total Interest</option>
+                            <option value="30.0">30% Total Interest</option>
+                            <option value="35.0">35% Total Interest</option>
+                            <option value="40.0">40% Total Interest</option>
                         </select>
                     </div>
                 <?php else: ?>
@@ -359,14 +361,13 @@ $('#assign_interest_rate').change(function() {
         const amount = <?php echo $loan['amount'] ?>;
         const months = <?php echo $loan['duration_months'] ?? 1 ?>;
 
-        // For multi-month loans: treat rate as ANNUAL rate
-        // Calculate using simple interest: Principal × (Annual Rate / 12) × Months
-        const monthlyRate = rate / 100 / 12;
-        const totalInterest = amount * monthlyRate * months;
+        // ALL loans use TOTAL interest (not annual)
+        // Interest = Principal × Rate%
+        const totalInterest = amount * (rate / 100);
         const totalPayable = amount + totalInterest;
         const monthlyPayment = totalPayable / months;
 
-        $('#preview-rate').text(rate + '% (annual)');
+        $('#preview-rate').text(rate + '% (total)');
         $('#preview-interest').text('K ' + totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2}));
         $('#preview-total').text('K ' + totalPayable.toLocaleString('en-US', {minimumFractionDigits: 2}));
         $('#preview-monthly').text('K ' + monthlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2}));

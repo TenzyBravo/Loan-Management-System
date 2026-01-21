@@ -96,7 +96,7 @@ if($amount > 0 && $duration_months > 0) {
             <div class="result-card">
                 <div class="result-label">Interest Rate</div>
                 <div class="result-value"><?php echo $interest_rate ?>%</div>
-                <small class="text-muted"><?php echo $calculation_type == 'compound' ? 'Compounded' : 'Simple' ?></small>
+                <small class="text-muted">Total Interest</small>
             </div>
         </div>
 

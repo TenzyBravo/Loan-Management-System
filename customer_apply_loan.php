@@ -317,7 +317,7 @@ $stmt->close();
                                         </div>
                                         <div class="col-md-8">
                                             <h5 class="mb-1">Rate Determined by Administrator</h5>
-                                            <small class="text-warning"><strong>Rate will be assigned based on your credit assessment (typically 10-40%)</strong></small>
+                                            <small class="text-warning"><strong>Total interest rate (10-40%) assigned based on credit assessment</strong></small>
                                         </div>
                                     </div>
                                 </div>
@@ -325,8 +325,8 @@ $stmt->close();
                                 <small class="form-text text-muted">
                                     <i class="fas fa-info-circle"></i>
                                     <strong>Interest Rate Policy:</strong><br>
-                                    • <strong>1-month loans:</strong> Fixed 18% total interest (automatically applied to full loan amount)<br>
-                                    • <strong>Multi-month loans:</strong> Annual interest rate (10-40%) determined by administrator based on credit assessment and risk profile
+                                    • <strong>1-month loans:</strong> Fixed 18% total interest (automatically applied)<br>
+                                    • <strong>Multi-month loans:</strong> Total interest rate (10-40%) determined by administrator based on credit assessment
                                 </small>
                             </div>
 
