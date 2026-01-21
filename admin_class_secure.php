@@ -893,16 +893,14 @@ class SecureAction {
         // Recalculate loan with assigned interest rate
         try {
             $duration_months = $loan['duration_months'] ?? 1;
-            $calculation_type = $loan['calculation_type'] ?? 'simple';
 
-            $calc = calculateLoan($loan['amount'], $interest_rate, $duration_months, $calculation_type);
+            $calc = calculateLoan($loan['amount'], $interest_rate, $duration_months, 'simple');
 
             $total_interest = $calc['total_interest'];
             $total_payable = $calc['total_payable'];
             $monthly_installment = $calc['monthly_installment'];
-            $outstanding_balance = $total_payable;
 
-            // Update loan with approved status and recalculated values
+            // First, try to update with all columns (for newer schema)
             $stmt = $this->conn->prepare("UPDATE loan_list SET
                 status = 1,
                 interest_rate = ?,
@@ -912,18 +910,30 @@ class SecureAction {
                 outstanding_balance = ?
                 WHERE id = ?
             ");
-            $stmt->bind_param("dddddi",
-                $interest_rate,
-                $total_interest,
-                $total_payable,
-                $monthly_installment,
-                $outstanding_balance,
-                $loan_id
-            );
+
+            if($stmt === false) {
+                // Some columns don't exist - use simpler update
+                $stmt = $this->conn->prepare("UPDATE loan_list SET status = 1 WHERE id = ?");
+                if($stmt === false) {
+                    return json_encode(['status' => 'error', 'message' => 'SQL Error: ' . $this->conn->error]);
+                }
+                $stmt->bind_param("i", $loan_id);
+            } else {
+                $outstanding_balance = $total_payable;
+                $stmt->bind_param("dddddi",
+                    $interest_rate,
+                    $total_interest,
+                    $total_payable,
+                    $monthly_installment,
+                    $outstanding_balance,
+                    $loan_id
+                );
+            }
 
             if(!$stmt->execute()) {
+                $error = $stmt->error;
                 $stmt->close();
-                return json_encode(['status' => 'error', 'message' => 'Database update failed']);
+                return json_encode(['status' => 'error', 'message' => 'Database update failed: ' . $error]);
             }
             $stmt->close();
 
