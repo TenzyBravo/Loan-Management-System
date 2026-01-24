@@ -12,8 +12,14 @@ require_once 'admin_class_secure.php';
 $action = $_GET['action'] ?? '';
 $crud = new SecureAction();
 
-// Actions that don't require CSRF (read-only or login)
-$csrfExempt = ['login', 'login2', 'logout', 'logout2', 'get_loan_review_details', 'approve_loan_application', 'deny_loan_application'];
+// Actions that don't require CSRF (read-only, login, or admin-only actions protected by session)
+$csrfExempt = [
+    'login', 'login2', 'logout', 'logout2',
+    'get_loan_review_details', 'approve_loan_application', 'deny_loan_application',
+    'delete_loan', 'delete_borrower', 'delete_payment', 'delete_loan_type', 'delete_plan', 'delete_user',
+    'update_document_status', 'save_payment', 'mark_loan_paid', 'apply_overdue_penalty',
+    'admin_change_password', 'admin_update_profile'
+];
 
 // Validate CSRF for non-exempt actions
 if (!in_array($action, $csrfExempt) && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -102,6 +108,22 @@ switch ($action) {
 
     case 'deny_loan_application':
         echo $crud->deny_loan_application();
+        break;
+
+    case 'mark_loan_paid':
+        echo $crud->mark_loan_paid();
+        break;
+
+    case 'apply_overdue_penalty':
+        echo $crud->apply_overdue_penalty();
+        break;
+
+    case 'admin_change_password':
+        echo $crud->admin_change_password();
+        break;
+
+    case 'admin_update_profile':
+        echo $crud->admin_update_profile();
         break;
 
     default:

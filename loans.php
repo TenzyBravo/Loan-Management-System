@@ -189,13 +189,25 @@ function delete_loan($id){
 			method:'POST',
 			data:{id:$id},
 			success:function(resp){
-				if(resp==1){
+				if(resp == 1){
 					alert_toast("Loan successfully deleted",'success')
 					setTimeout(function(){
 						location.reload()
 					},1500)
-
+				} else {
+					// Try to parse error response
+					try {
+						var err = JSON.parse(resp);
+						alert_toast("Error: " + err.message, 'error');
+					} catch(e) {
+						alert_toast("Error deleting loan: " + resp, 'error');
+					}
+					end_load();
 				}
+			},
+			error: function(xhr, status, error) {
+				alert_toast("Server error: " + error, 'error');
+				end_load();
 			}
 		})
 	}

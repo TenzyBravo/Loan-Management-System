@@ -17,7 +17,7 @@ include('./db_connect.php');
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
 
-  <title>Login | Loan Management System</title>
+  <title>Login | Brian Investments</title>
  	
 
 </head>
@@ -82,7 +82,7 @@ div#login-right::before {
 
 
   <main id="main" class=" bg-info">
-  	<h1>Loan Management System</h1>
+  	<h1>Brian Investments</h1>
   		<div id="login-left">
   		</div>
 

@@ -82,29 +82,34 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         $check_columns = $conn->query("SHOW COLUMNS FROM loan_list LIKE 'duration_months'");
         if($check_columns->num_rows > 0) {
             // Update with complete loan information
+            // Note: 'amount' is already set in INSERT, 'calculation_type' column doesn't exist
             $update_stmt = $conn->prepare("UPDATE loan_list SET
                 duration_months=?,
-                loan_amount=?,
                 interest_rate=?,
-                calculation_type=?,
                 total_interest=?,
                 total_payable=?,
                 monthly_installment=?,
                 outstanding_balance=?
                 WHERE id=?");
+
+            if($update_stmt === false) {
+                throw new Exception('Prepare failed: ' . $conn->error);
+            }
+
             $outstanding_balance = $totalPayable; // Initial outstanding balance
-            $update_stmt->bind_param("idssddddi",
+            $update_stmt->bind_param("idddddi",
                 $duration_months,
-                $amount,
                 $interest_rate,
-                $calculation_type,
                 $totalInterest,
                 $totalPayable,
                 $monthlyInstallment,
                 $outstanding_balance,
                 $loan_id
             );
-            $update_stmt->execute();
+
+            if(!$update_stmt->execute()) {
+                throw new Exception('Update failed: ' . $update_stmt->error);
+            }
             $update_stmt->close();
         }
         

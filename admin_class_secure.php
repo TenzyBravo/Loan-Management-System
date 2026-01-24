@@ -474,25 +474,73 @@ class SecureAction {
      * Delete Loan
      */
     public function delete_loan() {
-        $id = Security::sanitizeInt($_POST['id'] ?? '');
-        
-        // Delete schedules first
-        $stmt = $this->conn->prepare("DELETE FROM loan_schedules WHERE loan_id = ?");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Delete loan
-        $stmt = $this->conn->prepare("DELETE FROM loan_list WHERE id = ?");
-        $stmt->bind_param("i", $id);
-        $result = $stmt->execute();
-        $stmt->close();
-        
-        return $result ? 1 : 0;
+        $id = Security::sanitizeInt($_POST['id'] ?? 0);
+
+        if($id == 0) {
+            return json_encode(['status' => 'error', 'message' => 'Invalid loan ID']);
+        }
+
+        try {
+            // Delete related records first (order matters due to foreign keys)
+
+            // 1. Delete payments (if foreign key allows or doesn't exist)
+            $stmt = $this->conn->prepare("DELETE FROM payments WHERE loan_id = ?");
+            if($stmt) {
+                $stmt->bind_param("i", $id);
+                $stmt->execute();
+                $stmt->close();
+            }
+
+            // 2. Delete loan schedules
+            $stmt = $this->conn->prepare("DELETE FROM loan_schedules WHERE loan_id = ?");
+            if($stmt) {
+                $stmt->bind_param("i", $id);
+                $stmt->execute();
+                $stmt->close();
+            }
+
+            // 3. Delete loan installments
+            $stmt = $this->conn->prepare("DELETE FROM loan_installments WHERE loan_id = ?");
+            if($stmt) {
+                $stmt->bind_param("i", $id);
+                $stmt->execute();
+                $stmt->close();
+            }
+
+            // 4. Delete loan application checklist
+            $stmt = $this->conn->prepare("DELETE FROM loan_application_checklist WHERE loan_id = ?");
+            if($stmt) {
+                $stmt->bind_param("i", $id);
+                $stmt->execute();
+                $stmt->close();
+            }
+
+            // 5. Finally delete the loan itself
+            $stmt = $this->conn->prepare("DELETE FROM loan_list WHERE id = ?");
+            if($stmt === false) {
+                return json_encode(['status' => 'error', 'message' => 'SQL Error: ' . $this->conn->error]);
+            }
+            $stmt->bind_param("i", $id);
+            $result = $stmt->execute();
+
+            if(!$result) {
+                $error = $stmt->error;
+                $stmt->close();
+                return json_encode(['status' => 'error', 'message' => 'Delete failed: ' . $error]);
+            }
+
+            $stmt->close();
+            return 1; // Success
+
+        } catch(Exception $e) {
+            return json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 
     /**
      * Save Payment
+     * Records payment and updates loan outstanding balance
+     * Marks loan as completed when fully paid
      */
     public function save_payment() {
         $id = Security::sanitizeInt($_POST['id'] ?? '');
@@ -501,21 +549,99 @@ class SecureAction {
         $amount = Security::sanitizeFloat($_POST['amount'] ?? 0);
         $penalty_amount = Security::sanitizeFloat($_POST['penalty_amount'] ?? 0);
         $overdue = Security::sanitizeInt($_POST['overdue'] ?? 0);
-        
-        if (empty($id)) {
-            $stmt = $this->conn->prepare("INSERT INTO payments (loan_id, payee, amount, penalty_amount, overdue) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("isddi", $loan_id, $payee, $amount, $penalty_amount, $overdue);
-        } else {
-            $stmt = $this->conn->prepare("UPDATE payments SET loan_id = ?, payee = ?, amount = ?, penalty_amount = ?, overdue = ? WHERE id = ?");
-            $stmt->bind_param("isddii", $loan_id, $payee, $amount, $penalty_amount, $overdue, $id);
+
+        if ($loan_id == 0 || $amount <= 0) {
+            return json_encode(['status' => 'error', 'message' => 'Invalid loan ID or amount']);
         }
-        
-        $result = $stmt->execute();
-        $stmt->close();
-        
-        Security::logSecurityEvent('payment_saved', ['loan_id' => $loan_id, 'amount' => $amount], $this->conn);
-        
-        return $result ? 1 : 0;
+
+        // Start transaction
+        $this->conn->begin_transaction();
+
+        try {
+            // Insert or update payment record
+            if (empty($id)) {
+                $stmt = $this->conn->prepare("INSERT INTO payments (loan_id, payee, amount, penalty_amount, overdue) VALUES (?, ?, ?, ?, ?)");
+                $stmt->bind_param("isddi", $loan_id, $payee, $amount, $penalty_amount, $overdue);
+            } else {
+                $stmt = $this->conn->prepare("UPDATE payments SET loan_id = ?, payee = ?, amount = ?, penalty_amount = ?, overdue = ? WHERE id = ?");
+                $stmt->bind_param("isddii", $loan_id, $payee, $amount, $penalty_amount, $overdue, $id);
+            }
+
+            if (!$stmt->execute()) {
+                throw new Exception('Failed to save payment: ' . $stmt->error);
+            }
+            $stmt->close();
+
+            // Get loan details and calculate total paid
+            $stmt = $this->conn->prepare("
+                SELECT l.*, b.id as borrower_id, b.firstname, b.lastname,
+                       COALESCE((SELECT SUM(amount) FROM payments WHERE loan_id = l.id), 0) as total_paid
+                FROM loan_list l
+                INNER JOIN borrowers b ON l.borrower_id = b.id
+                WHERE l.id = ?
+            ");
+            $stmt->bind_param("i", $loan_id);
+            $stmt->execute();
+            $loan = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if (!$loan) {
+                throw new Exception('Loan not found');
+            }
+
+            $total_paid = $loan['total_paid'];
+            $total_payable = $loan['total_payable'] > 0 ? $loan['total_payable'] : $loan['amount'];
+            $outstanding_balance = max(0, $total_payable - $total_paid);
+            $borrower_id = $loan['borrower_id'];
+            $borrower_name = $loan['firstname'] . ' ' . $loan['lastname'];
+            $ref_no = $loan['ref_no'];
+
+            // Update outstanding balance on loan
+            $stmt = $this->conn->prepare("UPDATE loan_list SET outstanding_balance = ? WHERE id = ?");
+            $stmt->bind_param("di", $outstanding_balance, $loan_id);
+            $stmt->execute();
+            $stmt->close();
+
+            // Check if loan is fully paid - mark as completed (status = 3)
+            $loan_completed = false;
+            if ($outstanding_balance <= 0 && $loan['status'] == 2) {
+                $stmt = $this->conn->prepare("UPDATE loan_list SET status = 3, outstanding_balance = 0 WHERE id = ?");
+                $stmt->bind_param("i", $loan_id);
+                $stmt->execute();
+                $stmt->close();
+                $loan_completed = true;
+            }
+
+            // Send notification to customer about payment received
+            $formatted_amount = number_format($amount, 2);
+            $formatted_balance = number_format($outstanding_balance, 2);
+
+            if ($loan_completed) {
+                $title = "Loan Fully Paid!";
+                $message = "Congratulations! Your loan (Ref: $ref_no) has been fully paid. Thank you for your payments.";
+                $type = "success";
+            } else {
+                $title = "Payment Received";
+                $message = "Your payment of K $formatted_amount for loan (Ref: $ref_no) has been received. Outstanding balance: K $formatted_balance";
+                $type = "success";
+            }
+
+            $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("isss", $borrower_id, $title, $message, $type);
+            $stmt->execute();
+            $stmt->close();
+
+            // Commit transaction
+            $this->conn->commit();
+
+            Security::logSecurityEvent('payment_saved', ['loan_id' => $loan_id, 'amount' => $amount, 'completed' => $loan_completed], $this->conn);
+
+            return 1;
+
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            return json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -523,13 +649,154 @@ class SecureAction {
      */
     public function delete_payment() {
         $id = Security::sanitizeInt($_POST['id'] ?? '');
-        
+
         $stmt = $this->conn->prepare("DELETE FROM payments WHERE id = ?");
         $stmt->bind_param("i", $id);
         $result = $stmt->execute();
         $stmt->close();
-        
+
         return $result ? 1 : 0;
+    }
+
+    /**
+     * Mark Loan as Fully Paid
+     * Records the full outstanding amount as payment and marks loan as completed
+     */
+    public function mark_loan_paid() {
+        $loan_id = Security::sanitizeInt($_POST['loan_id'] ?? 0);
+        $amount = Security::sanitizeFloat($_POST['amount'] ?? 0);
+        $payee = Security::sanitizeString($_POST['payee'] ?? 'Full Payment');
+
+        if ($loan_id == 0 || $amount <= 0) {
+            return 'Invalid loan ID or amount';
+        }
+
+        $this->conn->begin_transaction();
+
+        try {
+            // Get loan and borrower info
+            $stmt = $this->conn->prepare("
+                SELECT l.*, b.id as borrower_id, b.firstname, b.lastname
+                FROM loan_list l
+                INNER JOIN borrowers b ON l.borrower_id = b.id
+                WHERE l.id = ?
+            ");
+            $stmt->bind_param("i", $loan_id);
+            $stmt->execute();
+            $loan = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if (!$loan) {
+                throw new Exception('Loan not found');
+            }
+
+            // Record the payment
+            $stmt = $this->conn->prepare("INSERT INTO payments (loan_id, payee, amount, penalty_amount, overdue) VALUES (?, ?, ?, 0, 0)");
+            $stmt->bind_param("isd", $loan_id, $payee, $amount);
+            if (!$stmt->execute()) {
+                throw new Exception('Failed to record payment');
+            }
+            $stmt->close();
+
+            // Update loan: set outstanding_balance to 0 and status to 3 (Completed)
+            $stmt = $this->conn->prepare("UPDATE loan_list SET outstanding_balance = 0, status = 3 WHERE id = ?");
+            $stmt->bind_param("i", $loan_id);
+            if (!$stmt->execute()) {
+                throw new Exception('Failed to update loan status');
+            }
+            $stmt->close();
+
+            // Notify customer
+            $borrower_id = $loan['borrower_id'];
+            $ref_no = $loan['ref_no'];
+            $formatted_amount = number_format($amount, 2);
+
+            $title = "Loan Fully Paid!";
+            $message = "Congratulations! Your loan (Ref: $ref_no) has been fully paid with K $formatted_amount. Thank you for your business!";
+            $type = "success";
+
+            $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("isss", $borrower_id, $title, $message, $type);
+            $stmt->execute();
+            $stmt->close();
+
+            $this->conn->commit();
+            return 1;
+
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            return $e->getMessage();
+        }
+    }
+
+    /**
+     * Apply Overdue Penalty
+     * Adds 5% penalty to the loan's total_payable and outstanding_balance
+     */
+    public function apply_overdue_penalty() {
+        $loan_id = Security::sanitizeInt($_POST['loan_id'] ?? 0);
+        $penalty_amount = Security::sanitizeFloat($_POST['penalty_amount'] ?? 0);
+
+        if ($loan_id == 0 || $penalty_amount <= 0) {
+            return 'Invalid loan ID or penalty amount';
+        }
+
+        $this->conn->begin_transaction();
+
+        try {
+            // Get current loan info
+            $stmt = $this->conn->prepare("
+                SELECT l.*, b.id as borrower_id, b.firstname, b.lastname
+                FROM loan_list l
+                INNER JOIN borrowers b ON l.borrower_id = b.id
+                WHERE l.id = ?
+            ");
+            $stmt->bind_param("i", $loan_id);
+            $stmt->execute();
+            $loan = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if (!$loan) {
+                throw new Exception('Loan not found');
+            }
+
+            // Calculate new totals with penalty
+            $current_total_payable = $loan['total_payable'] ?: $loan['amount'];
+            $current_outstanding = $loan['outstanding_balance'] ?: $current_total_payable;
+
+            $new_total_payable = $current_total_payable + $penalty_amount;
+            $new_outstanding = $current_outstanding + $penalty_amount;
+
+            // Update loan with penalty
+            $stmt = $this->conn->prepare("UPDATE loan_list SET total_payable = ?, outstanding_balance = ? WHERE id = ?");
+            $stmt->bind_param("ddi", $new_total_payable, $new_outstanding, $loan_id);
+            if (!$stmt->execute()) {
+                throw new Exception('Failed to apply penalty');
+            }
+            $stmt->close();
+
+            // Notify customer about penalty
+            $borrower_id = $loan['borrower_id'];
+            $ref_no = $loan['ref_no'];
+            $formatted_penalty = number_format($penalty_amount, 2);
+            $formatted_new_total = number_format($new_outstanding, 2);
+
+            $title = "Overdue Penalty Applied";
+            $message = "A 5% overdue penalty of K $formatted_penalty has been added to your loan (Ref: $ref_no). New outstanding balance: K $formatted_new_total. Please make payment as soon as possible.";
+            $type = "warning";
+
+            $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("isss", $borrower_id, $title, $message, $type);
+            $stmt->execute();
+            $stmt->close();
+
+            $this->conn->commit();
+            return 1;
+
+        } catch (Exception $e) {
+            $this->conn->rollback();
+            return $e->getMessage();
+        }
     }
 
     /**
@@ -588,6 +855,109 @@ class SecureAction {
         
         $stmt->close();
         return json_encode(['status' => 'error', 'message' => 'Failed to change password']);
+    }
+
+    /**
+     * Admin Change Password (without CSRF for AJAX)
+     */
+    public function admin_change_password() {
+        $userId = $_SESSION['login_id'] ?? 0;
+        $currentPassword = $_POST['current_password'] ?? '';
+        $newPassword = $_POST['new_password'] ?? '';
+        $confirmPassword = $_POST['confirm_password'] ?? '';
+
+        if ($userId == 0) {
+            return json_encode(['status' => 'error', 'message' => 'Not logged in']);
+        }
+
+        if (empty($currentPassword) || empty($newPassword)) {
+            return json_encode(['status' => 'error', 'message' => 'All fields are required']);
+        }
+
+        if ($newPassword !== $confirmPassword) {
+            return json_encode(['status' => 'error', 'message' => 'New passwords do not match']);
+        }
+
+        if (strlen($newPassword) < 6) {
+            return json_encode(['status' => 'error', 'message' => 'Password must be at least 6 characters']);
+        }
+
+        // Verify current password
+        $stmt = $this->conn->prepare("SELECT password FROM users WHERE id = ?");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$user) {
+            return json_encode(['status' => 'error', 'message' => 'User not found']);
+        }
+
+        // Check if password is hashed or plain text
+        $isHashed = strpos($user['password'], '$2') === 0;
+        if ($isHashed) {
+            $valid = password_verify($currentPassword, $user['password']);
+        } else {
+            $valid = ($user['password'] === md5($currentPassword)) || ($user['password'] === $currentPassword);
+        }
+
+        if (!$valid) {
+            return json_encode(['status' => 'error', 'message' => 'Current password is incorrect']);
+        }
+
+        // Update password (hash it)
+        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+        $stmt = $this->conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+        $stmt->bind_param("si", $hashedPassword, $userId);
+
+        if ($stmt->execute()) {
+            $stmt->close();
+            return 1;
+        }
+
+        $stmt->close();
+        return json_encode(['status' => 'error', 'message' => 'Failed to change password']);
+    }
+
+    /**
+     * Admin Update Profile
+     */
+    public function admin_update_profile() {
+        $userId = $_SESSION['login_id'] ?? 0;
+        $name = Security::sanitizeString($_POST['name'] ?? '');
+        $username = Security::sanitizeString($_POST['username'] ?? '');
+
+        if ($userId == 0) {
+            return json_encode(['status' => 'error', 'message' => 'Not logged in']);
+        }
+
+        if (empty($name) || empty($username)) {
+            return json_encode(['status' => 'error', 'message' => 'Name and username are required']);
+        }
+
+        // Check if username already exists (for another user)
+        $stmt = $this->conn->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+        $stmt->bind_param("si", $username, $userId);
+        $stmt->execute();
+        if ($stmt->get_result()->num_rows > 0) {
+            $stmt->close();
+            return json_encode(['status' => 'error', 'message' => 'Username already exists']);
+        }
+        $stmt->close();
+
+        // Update profile
+        $stmt = $this->conn->prepare("UPDATE users SET name = ?, username = ? WHERE id = ?");
+        $stmt->bind_param("ssi", $name, $username, $userId);
+
+        if ($stmt->execute()) {
+            // Update session name
+            $_SESSION['login_name'] = $name;
+            $stmt->close();
+            return 1;
+        }
+
+        $stmt->close();
+        return json_encode(['status' => 'error', 'message' => 'Failed to update profile']);
     }
 
     /**
@@ -811,16 +1181,35 @@ class SecureAction {
      * Update document status
      */
     public function update_document_status() {
-        $id = Security::sanitizeInt($_POST['id'] ?? 0);
+        // Accept either 'id' or 'document_id' for flexibility
+        $id = Security::sanitizeInt($_POST['document_id'] ?? $_POST['id'] ?? 0);
         $status = Security::sanitizeInt($_POST['status'] ?? 0);
+        $verification_notes = Security::sanitizeString($_POST['verification_notes'] ?? '');
+
+        // Validate ID
+        if ($id == 0) {
+            return json_encode(['status' => 'error', 'message' => 'Document ID is required']);
+        }
 
         // Validate status (should be 0 for pending, 1 for verified, 2 for rejected)
         if (!in_array($status, [0, 1, 2])) {
             return json_encode(['status' => 'error', 'message' => 'Invalid status value']);
         }
 
-        $stmt = $this->conn->prepare("UPDATE borrower_documents SET status = ?, verification_date = NOW() WHERE id = ?");
-        $stmt->bind_param("ii", $status, $id);
+        // Update with verification notes if provided (for rejection reasons)
+        if (!empty($verification_notes)) {
+            $stmt = $this->conn->prepare("UPDATE borrower_documents SET status = ?, verification_date = NOW(), verification_notes = ? WHERE id = ?");
+            if ($stmt === false) {
+                return json_encode(['status' => 'error', 'message' => 'Prepare failed: ' . $this->conn->error]);
+            }
+            $stmt->bind_param("isi", $status, $verification_notes, $id);
+        } else {
+            $stmt = $this->conn->prepare("UPDATE borrower_documents SET status = ?, verification_date = NOW() WHERE id = ?");
+            if ($stmt === false) {
+                return json_encode(['status' => 'error', 'message' => 'Prepare failed: ' . $this->conn->error]);
+            }
+            $stmt->bind_param("ii", $status, $id);
+        }
 
         if ($stmt->execute()) {
             $stmt->close();
@@ -848,6 +1237,10 @@ class SecureAction {
                     $title = "Document Verified";
                     $message = "Your $type_label has been verified successfully.";
                     $type = "success";
+                } elseif ($status == 2) {
+                    $title = "Document Rejected";
+                    $message = "Your $type_label was rejected. " . ($verification_notes ? "Reason: $verification_notes" : "Please upload a new document.");
+                    $type = "danger";
                 } else {
                     $title = "Document Status Updated";
                     $message = "Your $type_label status has been updated.";
@@ -900,9 +1293,10 @@ class SecureAction {
             $total_payable = $calc['total_payable'];
             $monthly_installment = $calc['monthly_installment'];
 
-            // First, try to update with all columns (for newer schema)
+            // Approve AND Release the loan (status = 2, set date_released)
             $stmt = $this->conn->prepare("UPDATE loan_list SET
-                status = 1,
+                status = 2,
+                date_released = NOW(),
                 interest_rate = ?,
                 total_interest = ?,
                 total_payable = ?,
@@ -913,7 +1307,7 @@ class SecureAction {
 
             if($stmt === false) {
                 // Some columns don't exist - use simpler update
-                $stmt = $this->conn->prepare("UPDATE loan_list SET status = 1 WHERE id = ?");
+                $stmt = $this->conn->prepare("UPDATE loan_list SET status = 2, date_released = NOW() WHERE id = ?");
                 if($stmt === false) {
                     return json_encode(['status' => 'error', 'message' => 'SQL Error: ' . $this->conn->error]);
                 }
@@ -940,7 +1334,7 @@ class SecureAction {
             // Create notification for customer (if table exists)
             try {
                 $message = sprintf(
-                    'Your loan application (Ref: %s) has been approved with %.1f%% interest rate. Total amount payable: %s over %d months.',
+                    'Your loan application (Ref: %s) has been approved and released! Interest rate: %.1f%%. Total payable: %s over %d month(s). Please ensure timely repayment.',
                     $loan['ref_no'],
                     $interest_rate,
                     formatCurrency($total_payable),
@@ -948,7 +1342,7 @@ class SecureAction {
                 );
 
                 $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
-                $title = 'Loan Approved';
+                $title = 'Loan Approved & Released';
                 $type = 'success';
                 $stmt->bind_param("isss",
                     $loan['borrower_id'],
@@ -992,27 +1386,45 @@ class SecureAction {
             return json_encode(['status' => 'error', 'message' => 'Loan not found']);
         }
 
-        // Update loan status to denied
-        $stmt = $this->conn->prepare("UPDATE loan_list SET status = 4 WHERE id = ?");
-        $stmt->bind_param("i", $loan_id);
+        // Update loan status to denied (4) and store denial reason
+        $stmt = $this->conn->prepare("UPDATE loan_list SET status = 4, denial_reason = ?, application_status = 4 WHERE id = ?");
+        if($stmt === false) {
+            return json_encode(['status' => 'error', 'message' => 'SQL Error: ' . $this->conn->error]);
+        }
+        $stmt->bind_param("si", $denial_reason, $loan_id);
 
         if(!$stmt->execute()) {
+            $error = $stmt->error;
             $stmt->close();
-            return json_encode(['status' => 'error', 'message' => 'Database update failed']);
+            return json_encode(['status' => 'error', 'message' => 'Database update failed: ' . $error]);
         }
         $stmt->close();
 
         // Create notification for customer
-        $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type)
-            VALUES (?, 'Loan Application Denied', 'Your loan application (Ref: ?) has been denied. Reason: ?', 'danger')");
-        $ref_no = $loan['ref_no'];
-        $stmt->bind_param("iss",
-            $loan['borrower_id'],
-            $ref_no,
-            $denial_reason
-        );
-        $stmt->execute();
-        $stmt->close();
+        try {
+            $message = sprintf(
+                'Your loan application (Ref: %s) has been denied. Reason: %s',
+                $loan['ref_no'],
+                $denial_reason
+            );
+
+            $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
+            if($stmt) {
+                $title = 'Loan Application Denied';
+                $type = 'error';
+                $stmt->bind_param("isss",
+                    $loan['borrower_id'],
+                    $title,
+                    $message,
+                    $type
+                );
+                $stmt->execute();
+                $stmt->close();
+            }
+        } catch(Exception $e) {
+            // Notification failed but loan was denied - continue
+            error_log("Notification creation failed: " . $e->getMessage());
+        }
 
         return 1; // Success
     }

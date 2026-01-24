@@ -13,7 +13,7 @@ if(!isset($_SESSION['login_id']))
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
 
-  <title>Admin Dashboard | Loan Management System</title>
+  <title>Admin Dashboard | Brian Investments</title>
 
 <?php include('./header.php'); ?>
 
@@ -97,7 +97,9 @@ if(!isset($_SESSION['login_id']))
           'manage_user',
           'plan',
           'loan_type',
-          'customer_documents_admin'
+          'customer_documents_admin',
+          'admin_profile',
+          'backup_export'
       ];
       $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 

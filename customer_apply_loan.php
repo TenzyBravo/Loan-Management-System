@@ -49,7 +49,7 @@ $stmt->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apply for Loan | Loan Management System</title>
+    <title>Apply for Loan | Brian Investments</title>
     
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -184,7 +184,7 @@ $stmt->close();
     <div class="sidebar">
         <div class="brand">
             <i class="fas fa-hand-holding-usd"></i><br>
-            Loan Portal
+            Brian Investments
         </div>
         <nav class="nav flex-column mt-4">
             <a class="nav-link" href="customer_dashboard.php">

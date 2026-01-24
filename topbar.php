@@ -92,20 +92,28 @@
   			<span class="fa fa-money-check-alt"></span>
   		</div>
       <div class="navbar-brand mb-0">
-        <b>Loan Management System</b>
+        <b>Brian Investments</b>
       </div>
     </div>
 
-	  <div class="topbar-user">
+	  <div class="dropdown">
 	  	<?php
 	  	$user_name = isset($_SESSION['login_name']) ? $_SESSION['login_name'] : 'Guest';
 	  	$initials = strtoupper(substr($user_name, 0, 1));
 	  	?>
-	  	<div class="user-avatar"><?php echo $initials ?></div>
-	  	<span style="font-weight: 500;"><?php echo $user_name ?></span>
-	  	<a href="ajax.php?action=logout" class="topbar-logout">
-	  		<i class="fa fa-power-off"></i>
-	  	</a>
+	  	<div class="topbar-user dropdown-toggle" data-toggle="dropdown" style="cursor: pointer;">
+	  		<div class="user-avatar"><?php echo $initials ?></div>
+	  		<span style="font-weight: 500;"><?php echo $user_name ?></span>
+	  	</div>
+	  	<div class="dropdown-menu dropdown-menu-right" style="margin-top: 10px;">
+	  		<a class="dropdown-item" href="admin.php?page=admin_profile">
+	  			<i class="fa fa-user-cog mr-2"></i> My Profile
+	  		</a>
+	  		<div class="dropdown-divider"></div>
+	  		<a class="dropdown-item text-danger" href="ajax.php?action=logout">
+	  			<i class="fa fa-power-off mr-2"></i> Logout
+	  		</a>
+	  	</div>
 	  </div>
   </div>
 

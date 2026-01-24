@@ -205,7 +205,7 @@
         <img src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80" alt="Financial Services" class="hero-image">
         <div class="hero-overlay"></div>
         <div class="container hero-content">
-            <h1 class="hero-title">Zambia Loan Management System</h1>
+            <h1 class="hero-title">Brian Investments</h1>
             <p class="hero-subtitle">Secure, Efficient, and Reliable Financial Solutions for Zambia</p>
             <div class="btn-container">
                 <a href="customer_login.php" class="btn-custom btn-primary">
@@ -280,7 +280,7 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2026 Zambia Loan Management System. All rights reserved.</p>
+            <p>&copy; 2026 Brian Investments. All rights reserved.</p>
             <p>Providing reliable financial solutions for the people of Zambia</p>
         </div>
     </footer>

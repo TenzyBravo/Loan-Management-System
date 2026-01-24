@@ -4,10 +4,13 @@ nav#sidebar {
   background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
   width: 260px;
   box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-  height: 100%;
+  height: 100vh;
   position: fixed;
   z-index: 99;
   left: 0;
+  top: 64px; /* Account for topbar height */
+  display: flex;
+  flex-direction: column;
 }
 
 /* Override Bootstrap bg-warning */
@@ -17,6 +20,28 @@ nav#sidebar.bg-warning {
 
 .sidebar-list {
   padding: 1rem 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  max-height: calc(100vh - 64px); /* Full height minus topbar */
+}
+
+/* Custom scrollbar styling */
+.sidebar-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-list::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+}
+
+.sidebar-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
+}
+
+.sidebar-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.3);
 }
 
 /* Modern Navigation Items */
@@ -89,6 +114,8 @@ nav#sidebar.bg-warning {
 @media (max-width: 991px) {
   nav#sidebar {
     left: -260px;
+    top: 64px;
+    height: calc(100vh - 64px);
   }
 
   nav#sidebar.active {
@@ -101,6 +128,10 @@ nav#sidebar.bg-warning {
 
   main#view-panel {
     margin-left: 0 !important;
+  }
+
+  .sidebar-list {
+    max-height: calc(100vh - 64px);
   }
 }
 
@@ -129,8 +160,9 @@ nav#sidebar {
 				<a href="admin.php?page=loan_type" class="nav-item nav-loan_type"><span class='icon-field'><i class="fa fa-th-list"></i></span> Loan Types</a>
 				<?php if(isset($_SESSION['login_type']) && $_SESSION['login_type'] == 1): ?>
 				<a href="admin.php?page=users" class="nav-item nav-users"><span class='icon-field'><i class="fa fa-users"></i></span> Users</a>
-
+				<a href="admin.php?page=backup_export" class="nav-item nav-backup_export"><span class='icon-field'><i class="fa fa-database"></i></span> Backup & Export</a>
 			<?php endif; ?>
+				<a href="admin.php?page=admin_profile" class="nav-item nav-admin_profile"><span class='icon-field'><i class="fa fa-user-cog"></i></span> My Profile</a>
 		</div>
 
 </nav>
