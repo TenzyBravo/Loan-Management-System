@@ -16,11 +16,11 @@ if (file_exists(__DIR__ . '/config.php')) {
 
     $environment = 'development';
 
-    // Database settings
-    $db_host = 'localhost';
-    $db_user = 'root';
-    $db_pass = '';
-    $db_name = 'loan_db';
+    // Database settings - Railway auto-sets these
+    $db_host = getenv('MYSQLHOST') ?: 'localhost';
+    $db_user = getenv('MYSQLUSER') ?: 'root';
+    $db_pass = getenv('MYSQLPASSWORD') ?: '';
+    $db_name = getenv('MYSQLDATABASE') ?: 'loan_db';
 
     // Error handling based on environment
     if ($environment === 'production') {
