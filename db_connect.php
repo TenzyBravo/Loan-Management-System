@@ -14,9 +14,9 @@ if (file_exists(__DIR__ . '/config.php')) {
     // Development mode - use hardcoded values
     // WARNING: Change these for production!
 
-    $environment = 'development';
+    $environment = getenv('ENVIRONMENT') ?: 'development';
 
-    // Database settings - Railway auto-sets these
+    // Database settings - Railway auto-sets these environment variables
     $db_host = getenv('MYSQLHOST') ?: 'localhost';
     $db_user = getenv('MYSQLUSER') ?: 'root';
     $db_pass = getenv('MYSQLPASSWORD') ?: '';
