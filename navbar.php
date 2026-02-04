@@ -163,6 +163,11 @@ nav#sidebar {
 				<a href="admin.php?page=backup_export" class="nav-item nav-backup_export"><span class='icon-field'><i class="fa fa-database"></i></span> Backup & Export</a>
 			<?php endif; ?>
 				<a href="admin.php?page=admin_profile" class="nav-item nav-admin_profile"><span class='icon-field'><i class="fa fa-user-cog"></i></span> My Profile</a>
+
+				<hr style="border-color: rgba(255,255,255,0.1); margin: 15px 0.75rem;">
+				<a href="ajax.php?action=logout" class="nav-item" style="color: #f87171 !important; background: rgba(239, 68, 68, 0.1);">
+					<span class='icon-field'><i class="fa fa-sign-out-alt"></i></span> Logout
+				</a>
 		</div>
 
 </nav>

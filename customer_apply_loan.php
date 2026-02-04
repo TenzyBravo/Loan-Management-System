@@ -177,9 +177,82 @@ $stmt->close();
             font-size: 1.1rem;
             color: #f57c00;
         }
+
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1001;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .mobile-menu-toggle {
+                display: block;
+            }
+
+            .sidebar {
+                left: -250px;
+                transition: left 0.3s ease;
+                z-index: 1000;
+            }
+
+            .sidebar.active {
+                left: 0;
+            }
+
+            .sidebar-overlay.active {
+                display: block;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 80px 15px 30px 15px;
+            }
+
+            .application-card {
+                padding: 20px;
+            }
+
+            .card-header-custom {
+                margin: -20px -20px 20px -20px;
+                padding: 15px;
+            }
+
+            .plan-card {
+                padding: 15px;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <i class="fas fa-bars"></i>
+    </button>
+    <div class="sidebar-overlay" onclick="toggleMobileMenu()"></div>
+
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="brand">
@@ -201,6 +274,10 @@ $stmt->close();
             </a>
             <a class="nav-link" href="customer_profile.php">
                 <i class="fas fa-user"></i> My Profile
+            </a>
+            <hr style="border-color: rgba(255,255,255,0.2); margin: 15px;">
+            <a class="nav-link" href="customer_logout.php" style="color: #ff6b6b !important;">
+                <i class="fas fa-sign-out-alt"></i> Logout
             </a>
         </nav>
     </div>
@@ -459,6 +536,20 @@ $stmt->close();
                 e.preventDefault();
                 alert('Please accept the terms and conditions');
                 return false;
+            }
+        });
+
+        // Mobile menu toggle
+        function toggleMobileMenu() {
+            $('.sidebar').toggleClass('active');
+            $('.sidebar-overlay').toggleClass('active');
+        }
+
+        // Close sidebar when clicking a nav link on mobile
+        $('.sidebar .nav-link').on('click', function() {
+            if ($(window).width() <= 768) {
+                $('.sidebar').removeClass('active');
+                $('.sidebar-overlay').removeClass('active');
             }
         });
     </script>

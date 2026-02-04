@@ -7,16 +7,33 @@
 class Database {
     private $conn;
     private static $instance = null;
-    
-    private $host = 'localhost';
-    private $username = 'root';
-    private $password = '';
-    private $database = 'loan_db';
-    
+
+    // Database credentials - loaded from config or environment
+    private $host;
+    private $username;
+    private $password;
+    private $database;
+
     /**
      * Constructor - establish connection
      */
     public function __construct() {
+        // Load from environment variables (for free hosting) or use defaults
+        $this->host = getenv('MYSQLHOST') ?: 'sql203.yzz.me';
+        $this->username = getenv('MYSQLUSER') ?: 'yzzme_41042304';
+        $this->password = getenv('MYSQLPASSWORD') ?: '';
+        $this->database = getenv('MYSQLDATABASE') ?: 'yzzme_41042304_loan_db';
+
+        // Check if config.php exists and load from there
+        $configFile = __DIR__ . '/../config.php';
+        if (file_exists($configFile)) {
+            include $configFile;
+            if (isset($db_host)) $this->host = $db_host;
+            if (isset($db_user)) $this->username = $db_user;
+            if (isset($db_pass)) $this->password = $db_pass;
+            if (isset($db_name)) $this->database = $db_name;
+        }
+
         $this->conn = new mysqli($this->host, $this->username, $this->password, $this->database);
         
         if ($this->conn->connect_error) {

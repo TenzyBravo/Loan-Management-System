@@ -9,6 +9,7 @@ require_once __DIR__ . '/includes/database.php';
 require_once __DIR__ . '/config/constants.php';
 require_once __DIR__ . '/includes/finance.php';
 require_once __DIR__ . '/includes/helpers.php';
+require_once __DIR__ . '/includes/notifications.php';
 
 Security::secureSession();
 
@@ -1331,27 +1332,9 @@ class SecureAction {
             }
             $stmt->close();
 
-            // Create notification for customer (if table exists)
+            // Notify customer (in-app notification + email)
             try {
-                $message = sprintf(
-                    'Your loan application (Ref: %s) has been approved and released! Interest rate: %.1f%%. Total payable: %s over %d month(s). Please ensure timely repayment.',
-                    $loan['ref_no'],
-                    $interest_rate,
-                    formatCurrency($total_payable),
-                    $duration_months
-                );
-
-                $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
-                $title = 'Loan Approved & Released';
-                $type = 'success';
-                $stmt->bind_param("isss",
-                    $loan['borrower_id'],
-                    $title,
-                    $message,
-                    $type
-                );
-                $stmt->execute();
-                $stmt->close();
+                notify_customer_loan_status($this->conn, $loan['borrower_id'], $loan_id, 2, $loan['amount']);
             } catch(Exception $e) {
                 // Notification failed but loan was approved - continue
                 error_log("Notification creation failed: " . $e->getMessage());
@@ -1400,27 +1383,9 @@ class SecureAction {
         }
         $stmt->close();
 
-        // Create notification for customer
+        // Notify customer (in-app notification + email)
         try {
-            $message = sprintf(
-                'Your loan application (Ref: %s) has been denied. Reason: %s',
-                $loan['ref_no'],
-                $denial_reason
-            );
-
-            $stmt = $this->conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
-            if($stmt) {
-                $title = 'Loan Application Denied';
-                $type = 'error';
-                $stmt->bind_param("isss",
-                    $loan['borrower_id'],
-                    $title,
-                    $message,
-                    $type
-                );
-                $stmt->execute();
-                $stmt->close();
-            }
+            notify_customer_loan_status($this->conn, $loan['borrower_id'], $loan_id, 4, $loan['amount'], $denial_reason);
         } catch(Exception $e) {
             // Notification failed but loan was denied - continue
             error_log("Notification creation failed: " . $e->getMessage());

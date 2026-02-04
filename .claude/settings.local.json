@@ -6,7 +6,8 @@
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
       "Bash(git push:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd production-ready configuration and security hardening\n\n- Add config.production.php template for hosting deployment\n- Update db_connect.php to auto-detect production config\n- Add .htaccess with security headers, HTTPS redirect, file protection\n- Add password migration script \\(database/upgrade_passwords.php\\)\n- Add DEPLOYMENT_CHECKLIST.md with step-by-step hosting guide\n- Remove debug error display from loans.php\n- Disable error display in production environment\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd production-ready configuration and security hardening\n\n- Add config.production.php template for hosting deployment\n- Update db_connect.php to auto-detect production config\n- Add .htaccess with security headers, HTTPS redirect, file protection\n- Add password migration script \\(database/upgrade_passwords.php\\)\n- Add DEPLOYMENT_CHECKLIST.md with step-by-step hosting guide\n- Remove debug error display from loans.php\n- Disable error display in production environment\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "WebFetch(domain:brianinvestment.yzz.me)"
     ]
   }
 }

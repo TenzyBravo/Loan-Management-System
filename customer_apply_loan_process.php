@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('db_connect.php');
+include('includes/notifications.php');
 
 if(!isset($_SESSION['customer_id'])){
     header('location: customer_login.php');
@@ -149,9 +150,20 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->execute();
         }
         $stmt->close();
-        
+
         // Commit transaction
         $conn->commit();
+
+        // Get customer name for notification
+        $stmt = $conn->prepare("SELECT firstname, lastname FROM borrowers WHERE id = ?");
+        $stmt->bind_param("i", $customer_id);
+        $stmt->execute();
+        $customer = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        $customer_name = $customer['firstname'] . ' ' . $customer['lastname'];
+
+        // Notify admin of new loan application (email + in-app notification)
+        notify_admin_new_loan($conn, $loan_id, $customer_name, $amount);
         
         $_SESSION['success_msg'] = 'Your loan application has been submitted successfully! Reference Number: ' . $ref_no;
         header('Location: customer_my_loans.php');

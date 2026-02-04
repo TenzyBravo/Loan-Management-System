@@ -333,7 +333,7 @@ $docs_result = $conn->query($docs_query);
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="customer_logout.php">
+                        <a class="nav-link text-danger" href="customer_logout.php" style="color: #dc3545 !important;">
                             <i class="fas fa-sign-out-alt"></i> Logout
                         </a>
                     </li>

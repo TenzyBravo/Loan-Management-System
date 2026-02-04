@@ -6,8 +6,13 @@ if(!isset($_SESSION['customer_id'])){
 }
 
 include('db_connect.php');
+include('includes/notifications.php');
 
 $customer_id = $_SESSION['customer_id'];
+
+// Get notification count
+$notification_count = get_customer_notification_count($conn, $customer_id);
+$customer_notifications = get_customer_notifications($conn, $customer_id, 5);
 
 // Get customer info
 $stmt = $conn->prepare("SELECT * FROM borrowers WHERE id = ?");
@@ -213,6 +218,116 @@ $stmt->close();
             color: white;
             text-decoration: none;
         }
+
+        /* Notification Bell Styles */
+        .top-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .notification-bell-btn {
+            position: relative;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .notification-bell-btn:hover {
+            background: #e9ecef;
+        }
+        .notification-bell-btn i {
+            font-size: 1.2rem;
+            color: #6c757d;
+        }
+        .notif-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            background: #dc3545;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 600;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+        }
+        .notification-dropdown-menu {
+            width: 320px;
+            max-height: 350px;
+            overflow-y: auto;
+            padding: 0;
+        }
+        .notif-header {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e9ecef;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .notif-header h6 {
+            margin: 0;
+            font-weight: 600;
+        }
+        .notif-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+            transition: background 0.2s;
+        }
+        .notif-item:hover {
+            background: #f8f9fa;
+            text-decoration: none;
+            color: inherit;
+        }
+        .notif-item.unread {
+            background: #e8f4fd;
+        }
+        .notif-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .notif-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .notif-content strong {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 2px;
+        }
+        .notif-content p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: #6c757d;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .notif-time {
+            font-size: 0.7rem;
+            color: #adb5bd;
+            margin-top: 3px;
+        }
+        .notif-empty {
+            padding: 30px;
+            text-align: center;
+            color: #adb5bd;
+        }
         .notification-item {
             padding: 12px 15px;
             border-bottom: 1px solid #f0f0f0;
@@ -260,46 +375,91 @@ $stmt->close();
             font-weight: 600;
         }
 
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1001;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
         /* Mobile Styles */
-        @media (max-width: 991px) {
+        @media (max-width: 768px) {
+            .mobile-menu-toggle {
+                display: block;
+            }
+
+            .sidebar-overlay.active {
+                display: block;
+            }
+
             .wrapper {
                 flex-direction: column;
             }
+
             .sidebar {
-                width: 100%;
-                min-height: auto;
-                padding: 10px 0;
+                position: fixed;
+                left: -250px;
+                top: 0;
+                height: 100vh;
+                width: 250px;
+                z-index: 1000;
+                transition: left 0.3s ease;
+                overflow-y: auto;
             }
-            .sidebar .brand {
-                padding: 10px;
-                font-size: 1.2rem;
+
+            .sidebar.active {
+                left: 0;
             }
+
             .sidebar nav {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
-                padding: 10px;
+                display: block;
             }
+
             .sidebar .nav-link {
-                padding: 8px 15px;
-                margin: 3px;
-                font-size: 0.85rem;
+                display: block;
+                padding: 12px 25px;
+                margin: 5px 15px;
             }
+
             .main-content {
-                padding: 15px;
+                padding: 80px 15px 15px 15px;
+                width: 100%;
             }
-        }
-        @media (max-width: 576px) {
+
             .top-bar {
                 flex-direction: column;
                 text-align: center;
             }
+
             .stat-card {
                 padding: 15px;
             }
+
             .stat-card h3 {
                 font-size: 1.5rem;
             }
+
             .stat-card .icon {
                 font-size: 28px;
             }
@@ -307,6 +467,12 @@ $stmt->close();
     </style>
 </head>
 <body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <i class="fas fa-bars"></i>
+    </button>
+    <div class="sidebar-overlay" onclick="toggleMobileMenu()"></div>
+
     <div class="wrapper">
         <!-- Sidebar -->
         <div class="sidebar">
@@ -329,6 +495,10 @@ $stmt->close();
                 <a class="nav-link" href="customer_profile.php">
                     <i class="fas fa-user"></i> My Profile
                 </a>
+                <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
+                <a class="nav-link text-danger" href="customer_logout.php" style="color: #ff6b6b !important;">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
             </nav>
         </div>
 
@@ -340,9 +510,49 @@ $stmt->close();
                     <h4>Welcome back, <?php echo htmlspecialchars($customer['firstname']); ?>!</h4>
                     <p>Here's what's happening with your loans today</p>
                 </div>
-                <a href="customer_logout.php" class="logout-btn">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </a>
+                <div class="top-bar-actions">
+                    <!-- Notification Bell -->
+                    <div class="dropdown">
+                        <div class="notification-bell-btn" data-toggle="dropdown">
+                            <i class="fas fa-bell"></i>
+                            <?php if ($notification_count > 0): ?>
+                            <span class="notif-badge"><?php echo $notification_count > 9 ? '9+' : $notification_count; ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="dropdown-menu dropdown-menu-right notification-dropdown-menu">
+                            <div class="notif-header">
+                                <h6><i class="fas fa-bell mr-2"></i>Notifications</h6>
+                                <?php if ($notification_count > 0): ?>
+                                <a href="customer_mark_notifications_read.php" class="text-primary" style="font-size: 0.8rem;">Mark all read</a>
+                                <?php endif; ?>
+                            </div>
+
+                            <?php if (!empty($customer_notifications)): ?>
+                                <?php foreach ($customer_notifications as $notif): ?>
+                                <a href="customer_my_loans.php" class="notif-item <?php echo $notif['is_read'] ? '' : 'unread'; ?>">
+                                    <div class="notif-icon">
+                                        <i class="fas <?php echo get_notification_icon($notif['type']); ?>"></i>
+                                    </div>
+                                    <div class="notif-content">
+                                        <strong><?php echo htmlspecialchars($notif['title']); ?></strong>
+                                        <p><?php echo htmlspecialchars($notif['message']); ?></p>
+                                        <div class="notif-time"><?php echo time_ago($notif['created_at']); ?></div>
+                                    </div>
+                                </a>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                            <div class="notif-empty">
+                                <i class="fas fa-check-circle" style="font-size: 2rem; color: #d1d5db;"></i>
+                                <p class="mt-2 mb-0">No notifications</p>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <a href="customer_logout.php" class="logout-btn">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
             </div>
 
             <!-- Statistics Cards -->
@@ -591,5 +801,20 @@ $stmt->close();
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Mobile menu toggle
+        function toggleMobileMenu() {
+            $('.sidebar').toggleClass('active');
+            $('.sidebar-overlay').toggleClass('active');
+        }
+
+        // Close sidebar when clicking a nav link on mobile
+        $('.sidebar .nav-link').on('click', function() {
+            if ($(window).width() <= 768) {
+                $('.sidebar').removeClass('active');
+                $('.sidebar-overlay').removeClass('active');
+            }
+        });
+    </script>
 </body>
 </html>

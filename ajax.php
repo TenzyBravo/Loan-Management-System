@@ -41,6 +41,14 @@ switch ($action) {
     case 'logout':
         $crud->logout();
         break;
+
+    case 'mark_all_notifications_read':
+        require_once 'includes/notifications.php';
+        require_once 'db_connect.php';
+        mark_all_admin_notifications_read($conn);
+        header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? 'admin.php'));
+        exit;
+        break;
         
     case 'save_user':
         echo $crud->save_user();
