@@ -191,31 +191,45 @@ class SecureAction {
             Security::logSecurityEvent('user_saved', ['user_id' => $id ?: $this->conn->insert_id], $this->conn);
             $stmt->close();
             return 1;
-        }
-        
-        $stmt->close();
-        return json_encode(['status' => 'error', 'message' => 'Failed to save user']);
-    }
+                // Require CSRF for profile updates
+                if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                    header('HTTP/1.1 405 Method Not Allowed');
+                    echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
+                    return;
+                }
 
-    /**
-     * Delete User
-     */
-    public function delete_user() {
-        if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
-            return json_encode(['status' => 'error', 'message' => 'Invalid request token']);
+                $csrf = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : '';
+                if (!Security::validateCSRFToken($csrf)) {
+                    header('HTTP/1.1 403 Forbidden');
+                    echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token']);
+                    return;
+                }
+
         }
-        
-        $id = Security::sanitizeInt($_POST['id'] ?? '');
-        
-        // Prevent deleting self
-        if ($id == ($_SESSION['login_id'] ?? 0)) {
-            return json_encode(['status' => 'error', 'message' => 'Cannot delete your own account']);
-        }
-        
-        $stmt = $this->conn->prepare("DELETE FROM users WHERE id = ?");
-        $stmt->bind_param("i", $id);
-        
-        if ($stmt->execute()) {
+                $name = isset($_POST['name']) ? Security::sanitizeString($_POST['name']) : '';
+                $username = isset($_POST['username']) ? Security::sanitizeString($_POST['username']) : '';
+
+                if (empty($name) || empty($username)) {
+                    echo json_encode(['status' => 'error', 'message' => 'Name and username are required']);
+                    return;
+                }
+
+                $userId = $_SESSION['login_id'];
+                $stmt = $this->conn->prepare("SELECT id FROM users WHERE username = ? AND id != ? LIMIT 1");
+                $stmt->bind_param('si', $username, $userId);
+                $stmt->execute();
+                $res = $stmt->get_result();
+                if ($res->num_rows > 0) {
+                    echo json_encode(['status' => 'error', 'message' => 'Username already taken']);
+                    return;
+                }
+
+                $stmt = $this->conn->prepare("UPDATE users SET name = ?, username = ? WHERE id = ?");
+                $stmt->bind_param('ssi', $name, $username, $userId);
+                $stmt->execute();
+
+                $_SESSION['login_name'] = $name;
+                echo json_encode(['status' => 'ok']);
             Security::logSecurityEvent('user_deleted', ['deleted_user_id' => $id], $this->conn);
             $stmt->close();
             return 1;
@@ -925,46 +939,65 @@ class SecureAction {
      */
     public function admin_update_profile() {
         $userId = $_SESSION['login_id'] ?? 0;
-        $name = Security::sanitizeString($_POST['name'] ?? '');
-        $username = Security::sanitizeString($_POST['username'] ?? '');
-
-        if ($userId == 0) {
-            return json_encode(['status' => 'error', 'message' => 'Not logged in']);
+        // Require CSRF token for this sensitive action and use consistent server-side checks.
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('HTTP/1.1 405 Method Not Allowed');
+            echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
+            return;
         }
 
-        if (empty($name) || empty($username)) {
-            return json_encode(['status' => 'error', 'message' => 'Name and username are required']);
+        $csrf = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : '';
+        if (!Security::validateCSRFToken($csrf)) {
+            header('HTTP/1.1 403 Forbidden');
+            echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token']);
+            return;
         }
 
-        // Check if username already exists (for another user)
-        $stmt = $this->conn->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
-        $stmt->bind_param("si", $username, $userId);
+        $currentPassword = isset($_POST['currentPassword']) ? $_POST['currentPassword'] : '';
+        $newPassword = isset($_POST['newPassword']) ? $_POST['newPassword'] : '';
+
+        // Enforce server-side minimum length consistent with change_password()
+        if (strlen($newPassword) < 8) {
+            echo json_encode(['status' => 'error', 'message' => 'New password must be at least 8 characters']);
+            return;
+        }
+
+        $userId = $_SESSION['login_id'];
+        $stmt = $this->conn->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
+        $stmt->bind_param('i', $userId);
         $stmt->execute();
-        if ($stmt->get_result()->num_rows > 0) {
-            $stmt->close();
-            return json_encode(['status' => 'error', 'message' => 'Username already exists']);
-        }
-        $stmt->close();
+        $res = $stmt->get_result();
+        $user = $res->fetch_assoc();
 
-        // Update profile
-        $stmt = $this->conn->prepare("UPDATE users SET name = ?, username = ? WHERE id = ?");
-        $stmt->bind_param("ssi", $name, $username, $userId);
-
-        if ($stmt->execute()) {
-            // Update session name
-            $_SESSION['login_name'] = $name;
-            $stmt->close();
-            return 1;
+        if (!$user) {
+            echo json_encode(['status' => 'error', 'message' => 'User not found']);
+            return;
         }
 
-        $stmt->close();
-        return json_encode(['status' => 'error', 'message' => 'Failed to update profile']);
-    }
+        // Use Security::verifyPassword for bcrypt; refuse legacy plaintext/md5 as a verification method here.
+        $verified = false;
+        if (strpos($user['password'], '$2') === 0) {
+            if (Security::verifyPassword($currentPassword, $user['password'])) {
+                $verified = true;
+            }
+        } else {
+            // Legacy hashes should have been migrated on login. Refuse change without prior migration.
+            echo json_encode(['status' => 'error', 'message' => 'Please login and update your password before attempting a password change via this endpoint.']);
+            return;
+        }
 
-    /**
-     * Get loan review details
-     */
-    public function get_loan_review_details() {
+        if (!$verified) {
+            echo json_encode(['status' => 'error', 'message' => 'Current password is incorrect']);
+            return;
+        }
+
+        $newHash = Security::hashPassword($newPassword);
+        $stmt = $this->conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+        $stmt->bind_param('si', $newHash, $userId);
+        $stmt->execute();
+
+        Security::logSecurityEvent('admin_password_changed', ['user_id' => $userId], $this->conn);
+        echo json_encode(['status' => 'ok']);
         $loan_id = Security::sanitizeInt($_POST['loan_id'] ?? 0);
 
         // Get loan details

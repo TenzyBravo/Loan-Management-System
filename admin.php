@@ -13,7 +13,7 @@ if(!isset($_SESSION['login_id']))
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
 
-  <title>Admin Dashboard | Brian Investments</title>
+  <title>Admin Dashboard | Tenzy Investments</title>
 
 <?php include('./header.php'); ?>
 

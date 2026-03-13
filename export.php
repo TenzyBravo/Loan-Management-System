@@ -45,7 +45,7 @@ if($type == 'database_backup') {
         $tables[] = $row[0];
     }
 
-    $sql_content = "-- Brian Investments Database Backup\n";
+    $sql_content = "-- Tenzy Investments Database Backup\n";
     $sql_content .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
     $sql_content .= "-- Database: loan_db\n\n";
     $sql_content .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
@@ -85,7 +85,7 @@ if($type == 'database_backup') {
     $sql_content .= "SET FOREIGN_KEY_CHECKS=1;\n";
 
     // Output SQL file
-    $filename = 'brian_investments_backup_' . date('Y-m-d_His') . '.sql';
+    $filename = 'tenzy_investments_backup_' . date('Y-m-d_His') . '.sql';
     header('Content-Type: application/sql');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Content-Length: ' . strlen($sql_content));

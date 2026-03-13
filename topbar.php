@@ -279,7 +279,7 @@ $total_badge = $pending_loans_count + $notification_count;
   			<span class="fa fa-money-check-alt"></span>
   		</div>
       <div class="navbar-brand mb-0">
-        <b>Brian Investments</b>
+        <b>Tenzy Investments</b>
       </div>
     </div>
 

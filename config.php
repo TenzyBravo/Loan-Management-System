@@ -1,6 +1,6 @@
 <?php
 /**
- * Free Hosting Configuration - Brian Investments Loan System
+ * Free Hosting Configuration - Tenzy Investments Loan System
  * Host: yzz.me (InfinityFree)
  */
 

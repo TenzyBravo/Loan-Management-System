@@ -1,7 +1,7 @@
 <?php
 /**
  * Database Connection
- * Brian Investments Loan System
+ * Tenzy Investments Loan System
  *
  * For production: Copy config.production.php to config.php and update credentials
  */

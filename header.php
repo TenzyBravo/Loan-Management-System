@@ -29,6 +29,12 @@
   <!-- Template Main CSS File -->
   <link href="assets/css/style.css" rel="stylesheet">
   <link type="text/css" rel="stylesheet" href="assets/css/jquery-te-1.4.0.css">
+
+  <!-- Site Favicon (SVG + PNG fallback for older browsers) -->
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+  <link rel="alternate icon" href="/img/favicon.svg" type="image/svg+xml">
+  <!-- PNG fallback (data URI 1x1 PNG) -->
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=">
   
   <script src="assets/vendor/jquery/jquery.min.js"></script>
   <script src="assets/DataTables/datatables.min.js"></script>

@@ -123,7 +123,7 @@ function mark_all_customer_notifications_read($conn, $borrower_id) {
  * Send email notification
  * Uses PHP mail() function - works on most hosting
  */
-function send_email_notification($to_email, $to_name, $subject, $message, $from_name = 'Brian Investments') {
+function send_email_notification($to_email, $to_name, $subject, $message, $from_name = 'Tenzy Investments') {
     // Email configuration
     $from_email = 'noreply@brianinvestment.yzz.me'; // Change this to your domain
 
@@ -153,16 +153,16 @@ function send_email_notification($to_email, $to_name, $subject, $message, $from_
     <body>
         <div class='container'>
             <div class='header'>
-                <h1 style='margin:0;'>Brian Investments</h1>
+                <h1 style='margin:0;'>Tenzy Investments</h1>
                 <p style='margin:5px 0 0 0; opacity:0.9;'>Loan Management System</p>
             </div>
             <div class='content'>
                 <p>Dear {$to_name},</p>
                 {$message}
-                <p style='margin-top:20px;'>Best regards,<br><strong>Brian Investments Team</strong></p>
+                <p style='margin-top:20px;'>Best regards,<br><strong>Tenzy Investments Team</strong></p>
             </div>
             <div class='footer'>
-                <p>This is an automated message from Brian Investments Loan Management System.</p>
+                <p>This is an automated message from Tenzy Investments Loan Management System.</p>
                 <p>Please do not reply directly to this email.</p>
             </div>
         </div>
@@ -280,7 +280,7 @@ function notify_customer_loan_status($conn, $borrower_id, $loan_id, $status, $am
         ";
     }
 
-    send_email_notification($customer_email, $customer_name, "Loan Application {$status_info['text']} - Brian Investments", $email_message);
+    send_email_notification($customer_email, $customer_name, "Loan Application {$status_info['text']} - Tenzy Investments", $email_message);
 
     return true;
 }
@@ -317,7 +317,7 @@ function notify_customer_payment($conn, $borrower_id, $loan_id, $amount, $remain
         <a href='https://brianinvestment.yzz.me/customer_my_loans.php' class='btn'>View Payment History</a>
     ";
 
-    send_email_notification($customer_email, $customer_name, "Payment Received - Brian Investments", $email_message);
+    send_email_notification($customer_email, $customer_name, "Payment Received - Tenzy Investments", $email_message);
 
     return true;
 }

@@ -3,8 +3,12 @@
 <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <title>Brian Investments - Quick Loans in Zambia | Fast Cash When You Need It</title>
+    <title>Tenzy Investments - Quick Loans in Zambia | Fast Cash When You Need It</title>
     <meta name="description" content="Get quick personal loans in Zambia. Low interest rates, fast approval, easy repayment. Apply online today!">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="img/favicon.svg">
+    <link rel="shortcut icon" href="img/favicon.svg" />
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
@@ -21,6 +25,8 @@
         body {
             font-family: 'Poppins', sans-serif;
             overflow-x: hidden;
+            /* make room for the fixed navbar to avoid overlap */
+            padding-top: 80px;
         }
 
         /* Navbar */
@@ -32,6 +38,13 @@
             width: 100%;
             top: 0;
             z-index: 1000;
+        }
+
+        /* keep navbar contents vertically centered and spaced */
+        .navbar-custom .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .navbar-brand {
@@ -120,10 +133,12 @@
             display: flex;
             gap: 40px;
             margin-top: 40px;
+            align-items: center;
         }
 
         .stat-item {
             text-align: center;
+            flex: 1; /* distribute evenly */
         }
 
         .stat-number {
@@ -704,7 +719,7 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-custom">
         <div class="container">
-            <a class="navbar-brand" href="#">Brian <span>Investments</span></a>
+            <a class="navbar-brand" href="#">Tenzy <span>Investments</span></a>
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -827,7 +842,7 @@
         <div class="container">
             <div class="section-header">
                 <h2>Loan Requirements</h2>
-                <p>What you need to apply for a loan at Brian Investments</p>
+                <p>What you need to apply for a loan at Tenzy Investments</p>
             </div>
 
             <div id="requirementsCarousel" class="carousel slide" data-ride="carousel" data-interval="3000">
@@ -936,7 +951,7 @@
             <div class="row align-items-center">
                 <div class="col-lg-6 mb-4">
                     <div class="section-header text-left">
-                        <h2>Why Choose Brian Investments?</h2>
+                        <h2>Why Choose Tenzy Investments?</h2>
                         <p>We're committed to helping Zambians achieve their financial goals with trusted loan services.</p>
                     </div>
 
@@ -1033,7 +1048,7 @@
     <section class="cta-section">
         <div class="container">
             <h2>Ready to Get Started?</h2>
-            <p>Join thousands of Zambians who trust Brian Investments for their financial needs.</p>
+            <p>Join thousands of Zambians who trust Tenzy Investments for their financial needs.</p>
             <a href="customer_register.php" class="btn-cta">
                 <i class="fas fa-paper-plane"></i> Apply for a Loan Today
             </a>
@@ -1048,7 +1063,7 @@
         <div class="container">
             <div class="row">
                 <div class="col-lg-4 mb-4">
-                    <div class="footer-logo">Brian <span>Investments</span></div>
+                    <div class="footer-logo">Tenzy <span>Investments</span></div>
                     <p class="footer-desc">Providing reliable and affordable loan services to the people of Zambia since 2020.</p>
                     <div class="social-links">
                         <a href="#" class="text-white mr-3"><i class="fab fa-facebook fa-lg"></i></a>
@@ -1083,8 +1098,8 @@
                     </div>
                 </div>
             </div>
-            <div class="footer-bottom">
-                <p>&copy; 2026 Brian Investments. All rights reserved. | Registered in Zambia</p>
+                <div class="footer-bottom">
+                <p>&copy; 2026 Tenzy Investments. All rights reserved. | Registered in Zambia</p>
             </div>
         </div>
     </footer>

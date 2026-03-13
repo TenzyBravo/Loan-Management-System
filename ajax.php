@@ -13,12 +13,12 @@ $action = $_GET['action'] ?? '';
 $crud = new SecureAction();
 
 // Actions that don't require CSRF (read-only, login, or admin-only actions protected by session)
+// Only exempt read-only or login/logout endpoints from CSRF.
+// All state-changing actions must require a valid CSRF token.
 $csrfExempt = [
     'login', 'login2', 'logout', 'logout2',
-    'get_loan_review_details', 'approve_loan_application', 'deny_loan_application',
-    'delete_loan', 'delete_borrower', 'delete_payment', 'delete_loan_type', 'delete_plan', 'delete_user',
-    'update_document_status', 'save_payment', 'mark_loan_paid', 'apply_overdue_penalty',
-    'admin_change_password', 'admin_update_profile'
+    // read-only detail fetchers
+    'get_loan_review_details'
 ];
 
 // Validate CSRF for non-exempt actions
@@ -26,11 +26,16 @@ if (!in_array($action, $csrfExempt) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['csrf_token'] ?? '';
     if (!Security::validateCSRFToken($token)) {
         http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token. Please refresh the page and try again.']);
-        ob_end_flush();
         exit;
     }
 }
+
+// Which actions return HTML (preserve their output as-is)
+$htmlResponses = [
+    'get_loan_review_details'
+];
 
 // Route to appropriate action
 switch ($action) {
@@ -134,9 +139,36 @@ switch ($action) {
         echo $crud->admin_update_profile();
         break;
 
-    default:
-        echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
-        break;
-}
+        default:
+            echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
+            break;
+    }
 
-ob_end_flush();
+    // Grab buffered output and normalize
+    $output = ob_get_clean();
+
+    // If this was a POST (state-changing) request and not an HTML response, return JSON
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !in_array($action, $htmlResponses)) {
+        header('Content-Type: application/json; charset=utf-8');
+        $trim = trim($output);
+
+        // If handler already returned valid JSON, pass it through
+        $decoded = json_decode($trim, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            echo $trim;
+            exit;
+        }
+
+        // Common legacy short responses: '1', 'ok', or empty
+        if ($trim === '1' || strtolower($trim) === 'ok' || $trim === '') {
+            echo json_encode(['status' => 'ok']);
+            exit;
+        }
+
+        // Otherwise wrap as data
+        echo json_encode(['status' => 'ok', 'data' => $trim]);
+        exit;
+    }
+
+    // For GET or HTML responses, output as-is
+    echo $output;

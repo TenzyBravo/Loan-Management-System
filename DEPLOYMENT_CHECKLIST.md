@@ -1,4 +1,4 @@
-# Brian Investments - Production Deployment Checklist
+# Tenzy Investments - Production Deployment Checklist
 
 ## Pre-Deployment Steps
 
