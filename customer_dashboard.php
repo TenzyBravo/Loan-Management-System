@@ -7,6 +7,10 @@ if(!isset($_SESSION['customer_id'])){
 
 include('db_connect.php');
 include('includes/notifications.php');
+include('includes/security.php');
+
+// Update last activity on page load
+Security::updateActivity();
 
 $customer_id = $_SESSION['customer_id'];
 
@@ -80,7 +84,7 @@ $stmt->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Dashboard | Tenzy Investments</title>
+    <title>Customer Dashboard | Basils Money Lenders</title>
 
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -477,7 +481,7 @@ $stmt->close();
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="brand">
-                <i class="fas fa-hand-holding-usd"></i> Tenzy Investments
+                <i class="fas fa-hand-holding-usd"></i> Basils Money Lenders
             </div>
             <nav>
                 <a class="nav-link active" href="customer_dashboard.php">
@@ -509,6 +513,11 @@ $stmt->close();
                 <div class="welcome-text">
                     <h4>Welcome back, <?php echo htmlspecialchars($customer['firstname']); ?>!</h4>
                     <p>Here's what's happening with your loans today</p>
+                    <?php if (!empty($customer['last_login'])): ?>
+                        <small style="color: #6b7280; font-size: 0.85rem;">
+                            <i class="fas fa-clock"></i> Last login: <?php echo date('M j, Y g:i A', strtotime($customer['last_login'])); ?>
+                        </small>
+                    <?php endif; ?>
                 </div>
                 <div class="top-bar-actions">
                     <!-- Notification Bell -->
@@ -815,6 +824,45 @@ $stmt->close();
                 $('.sidebar-overlay').removeClass('active');
             }
         });
+
+        // Session timeout warning
+        (function() {
+            var sessionTimeout = <?php echo Security::SESSION_TIMEOUT; ?>;
+            var warningTime = <?php echo Security::SESSION_WARNING; ?>;
+            var lastActivity = Date.now();
+            var warningShown = false;
+
+            // Track activity
+            ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(function(event) {
+                document.addEventListener(event, function() {
+                    var now = Date.now();
+                    if (now - lastActivity > 60000) {  // Update once per minute
+                        lastActivity = now;
+                        $.post('customer_session.php?action=extend');
+                    }
+                }, { passive: true });
+            });
+
+            // Check session periodically
+            setInterval(function() {
+                $.get('customer_session.php?action=check', function(resp) {
+                    try {
+                        var data = JSON.parse(resp);
+                        if (!data.valid) {
+                            alert('Your session has expired. Please login again.');
+                            window.location.href = 'customer_login.php?expired=1';
+                        } else if (data.warning && !warningShown) {
+                            warningShown = true;
+                            if (confirm('Your session will expire in ' + Math.floor(data.remaining/60) + ' minutes. Click OK to stay logged in.')) {
+                                $.post('customer_session.php?action=extend', function() {
+                                    warningShown = false;
+                                });
+                            }
+                        }
+                    } catch(e) {}
+                });
+            }, 60000);  // Check every minute
+        })();
     </script>
 </body>
 </html>

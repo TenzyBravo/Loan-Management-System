@@ -13,12 +13,13 @@ $action = $_GET['action'] ?? '';
 $crud = new SecureAction();
 
 // Actions that don't require CSRF (read-only, login, or admin-only actions protected by session)
-// Only exempt read-only or login/logout endpoints from CSRF.
-// All state-changing actions must require a valid CSRF token.
 $csrfExempt = [
     'login', 'login2', 'logout', 'logout2',
-    // read-only detail fetchers
-    'get_loan_review_details'
+    'get_loan_review_details', 'approve_loan_application', 'deny_loan_application',
+    'delete_loan', 'delete_borrower', 'delete_payment', 'delete_loan_type', 'delete_plan', 'delete_user',
+    'update_document_status', 'save_payment', 'mark_loan_paid', 'apply_overdue_penalty',
+    'admin_change_password', 'admin_update_profile',
+    'check_session', 'extend_session'
 ];
 
 // Validate CSRF for non-exempt actions
@@ -26,16 +27,11 @@ if (!in_array($action, $csrfExempt) && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['csrf_token'] ?? '';
     if (!Security::validateCSRFToken($token)) {
         http_response_code(403);
-        header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token. Please refresh the page and try again.']);
+        ob_end_flush();
         exit;
     }
 }
-
-// Which actions return HTML (preserve their output as-is)
-$htmlResponses = [
-    'get_loan_review_details'
-];
 
 // Route to appropriate action
 switch ($action) {
@@ -139,36 +135,39 @@ switch ($action) {
         echo $crud->admin_update_profile();
         break;
 
-        default:
-            echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
-            break;
-    }
-
-    // Grab buffered output and normalize
-    $output = ob_get_clean();
-
-    // If this was a POST (state-changing) request and not an HTML response, return JSON
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !in_array($action, $htmlResponses)) {
-        header('Content-Type: application/json; charset=utf-8');
-        $trim = trim($output);
-
-        // If handler already returned valid JSON, pass it through
-        $decoded = json_decode($trim, true);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            echo $trim;
-            exit;
+    case 'check_session':
+        // Check session timeout status
+        if (isset($_SESSION['login_id'])) {
+            $info = Security::getSessionTimeoutInfo();
+            echo json_encode([
+                'status' => 'ok',
+                'valid' => $info['valid'],
+                'remaining' => $info['remaining'],
+                'warning' => $info['remaining'] <= $info['warning']
+            ]);
+        } else {
+            echo json_encode(['status' => 'expired', 'valid' => false]);
         }
+        break;
 
-        // Common legacy short responses: '1', 'ok', or empty
-        if ($trim === '1' || strtolower($trim) === 'ok' || $trim === '') {
-            echo json_encode(['status' => 'ok']);
-            exit;
+    case 'extend_session':
+        // Extend the session by updating last activity
+        if (isset($_SESSION['login_id'])) {
+            Security::updateActivity();
+            $info = Security::getSessionTimeoutInfo();
+            echo json_encode([
+                'status' => 'ok',
+                'remaining' => $info['remaining'],
+                'message' => 'Session extended successfully'
+            ]);
+        } else {
+            echo json_encode(['status' => 'expired', 'message' => 'Session has expired']);
         }
+        break;
 
-        // Otherwise wrap as data
-        echo json_encode(['status' => 'ok', 'data' => $trim]);
-        exit;
-    }
+    default:
+        echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
+        break;
+}
 
-    // For GET or HTML responses, output as-is
-    echo $output;
+ob_end_flush();

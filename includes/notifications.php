@@ -121,18 +121,11 @@ function mark_all_customer_notifications_read($conn, $borrower_id) {
 
 /**
  * Send email notification
- * Uses PHP mail() function - works on most hosting
+ * Uses SMTP for reliable delivery (works on free hosting)
  */
-function send_email_notification($to_email, $to_name, $subject, $message, $from_name = 'Tenzy Investments') {
-    // Email configuration
-    $from_email = 'noreply@brianinvestment.yzz.me'; // Change this to your domain
-
-    // Build email headers
-    $headers = "MIME-Version: 1.0\r\n";
-    $headers .= "Content-type: text/html; charset=UTF-8\r\n";
-    $headers .= "From: {$from_name} <{$from_email}>\r\n";
-    $headers .= "Reply-To: {$from_email}\r\n";
-    $headers .= "X-Mailer: PHP/" . phpversion();
+function send_email_notification($to_email, $to_name, $subject, $message, $from_name = 'Basils Money Lenders', $conn = null) {
+    // Include SMTP class
+    require_once __DIR__ . '/smtp_mail.php';
 
     // Build HTML email
     $html_message = "
@@ -153,16 +146,16 @@ function send_email_notification($to_email, $to_name, $subject, $message, $from_
     <body>
         <div class='container'>
             <div class='header'>
-                <h1 style='margin:0;'>Tenzy Investments</h1>
+                <h1 style='margin:0;'>Basils Money Lenders</h1>
                 <p style='margin:5px 0 0 0; opacity:0.9;'>Loan Management System</p>
             </div>
             <div class='content'>
                 <p>Dear {$to_name},</p>
                 {$message}
-                <p style='margin-top:20px;'>Best regards,<br><strong>Tenzy Investments Team</strong></p>
+                <p style='margin-top:20px;'>Best regards,<br><strong>Basils Money Lenders Team</strong></p>
             </div>
             <div class='footer'>
-                <p>This is an automated message from Tenzy Investments Loan Management System.</p>
+                <p>This is an automated message from Basils Money Lenders Loan Management System.</p>
                 <p>Please do not reply directly to this email.</p>
             </div>
         </div>
@@ -170,11 +163,23 @@ function send_email_notification($to_email, $to_name, $subject, $message, $from_
     </html>
     ";
 
-    // Try to send email
-    $result = @mail($to_email, $subject, $html_message, $headers);
+    // Try SMTP first
+    $result = smtp_send_email($to_email, $to_name, $subject, $html_message, $conn);
 
-    // Log email attempt
-    error_log("Email notification sent to {$to_email}: " . ($result ? "Success" : "Failed"));
+    if ($result) {
+        error_log("Email sent via SMTP to {$to_email}: Success");
+        return true;
+    }
+
+    // Fallback to PHP mail() if SMTP fails or not configured
+    $from_email = 'noreply@brianinvestment.yzz.me';
+    $headers = "MIME-Version: 1.0\r\n";
+    $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+    $headers .= "From: {$from_name} <{$from_email}>\r\n";
+    $headers .= "Reply-To: {$from_email}\r\n";
+
+    $result = @mail($to_email, $subject, $html_message, $headers);
+    error_log("Email sent via mail() to {$to_email}: " . ($result ? "Success" : "Failed"));
 
     return $result;
 }
@@ -200,7 +205,7 @@ function notify_admin_new_loan($conn, $loan_id, $borrower_name, $amount) {
             <p>Please log in to the admin panel to review this application.</p>
             <a href='https://brianinvestment.yzz.me/admin.php?page=loan_applications_review' class='btn'>Review Application</a>
         ";
-        send_email_notification($admin_row['email'], $admin_row['name'], "New Loan Application - {$borrower_name}", $email_message);
+        send_email_notification($admin_row['email'], $admin_row['name'], "New Loan Application - {$borrower_name}", $email_message, 'Basils Money Lenders', $conn);
     }
 }
 
@@ -280,7 +285,7 @@ function notify_customer_loan_status($conn, $borrower_id, $loan_id, $status, $am
         ";
     }
 
-    send_email_notification($customer_email, $customer_name, "Loan Application {$status_info['text']} - Tenzy Investments", $email_message);
+    send_email_notification($customer_email, $customer_name, "Loan Application {$status_info['text']} - Basils Money Lenders", $email_message, 'Basils Money Lenders', $conn);
 
     return true;
 }
@@ -317,7 +322,7 @@ function notify_customer_payment($conn, $borrower_id, $loan_id, $amount, $remain
         <a href='https://brianinvestment.yzz.me/customer_my_loans.php' class='btn'>View Payment History</a>
     ";
 
-    send_email_notification($customer_email, $customer_name, "Payment Received - Tenzy Investments", $email_message);
+    send_email_notification($customer_email, $customer_name, "Payment Received - Basils Money Lenders", $email_message, 'Basils Money Lenders', $conn);
 
     return true;
 }

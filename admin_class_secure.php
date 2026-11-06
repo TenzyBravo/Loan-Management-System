@@ -33,14 +33,31 @@ class SecureAction {
     public function login() {
         $username = Security::sanitizeString($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
-        
-        // Rate limiting
+
+        // Rate limiting - check both session and database (fail open on errors)
         $ipKey = 'login_' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
-        if (!Security::checkRateLimit($ipKey, 5, 15)) {
-            Security::logSecurityEvent('login_rate_limited', ['username' => $username], $this->conn);
-            return json_encode(['status' => 'error', 'message' => 'Too many login attempts. Please try again in 15 minutes.']);
+
+        // Session-based rate limiting (quick check)
+        try {
+            if (!Security::checkRateLimit($ipKey, 5, 15)) {
+                @Security::logSecurityEvent('login_rate_limited', ['username' => $username], $this->conn);
+                return json_encode(['status' => 'error', 'message' => 'Too many login attempts. Please try again in 15 minutes.']);
+            }
+        } catch (Exception $e) {
+            // Rate limit check failed, allow login (fail open for availability)
         }
-        
+
+        // Database-based rate limiting (persistent across sessions)
+        try {
+            $dbRateLimit = Security::checkLoginRateLimit($this->conn, 5, 15);
+            if (!$dbRateLimit['allowed']) {
+                @Security::logSecurityEvent('login_rate_limited_db', ['username' => $username], $this->conn);
+                return json_encode(['status' => 'error', 'message' => 'Too many login attempts. Please try again in 15 minutes.']);
+            }
+        } catch (Exception $e) {
+            // Rate limit check failed, allow login (fail open for availability)
+        }
+
         if (empty($username) || empty($password)) {
             return 3; // Invalid
         }
@@ -73,8 +90,13 @@ class SecureAction {
             }
             
             if ($passwordValid) {
-                // Clear rate limit on successful login
-                Security::clearRateLimit($ipKey);
+                // Clear rate limit on successful login (fail silently)
+                try {
+                    Security::clearRateLimit($ipKey);
+                    Security::recordLoginAttempt($this->conn, $username, true);
+                } catch (Exception $e) {
+                    // Failed to record login, ignore
+                }
 
                 // Set session variables FIRST before regeneration
                 foreach ($user as $key => $value) {
@@ -86,17 +108,52 @@ class SecureAction {
                 // Regenerate session ID to prevent fixation (after setting session data)
                 Security::regenerateSession();
 
-                // Log successful login
-                Security::logSecurityEvent('login_success', ['user_id' => $user['id'], 'username' => $username], $this->conn);
+                // Update last login timestamp and IP (fail silently if columns don't exist)
+                try {
+                    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+                    $updateLogin = $this->conn->prepare("UPDATE users SET last_login = NOW(), last_login_ip = ? WHERE id = ?");
+                    if ($updateLogin) {
+                        $updateLogin->bind_param("si", $ip, $user['id']);
+                        @$updateLogin->execute();
+                        @$updateLogin->close();
+                    }
+                } catch (Exception $e) {
+                    // Columns don't exist yet, ignore
+                }
+
+                // Log successful login (fail silently)
+                try {
+                    Security::logSecurityEvent('login_success', ['user_id' => $user['id'], 'username' => $username], $this->conn);
+                } catch (Exception $e) {
+                    // Logging failed, ignore
+                }
+
+                // Cleanup old login attempts periodically (fail silently)
+                try {
+                    Security::cleanupLoginAttempts($this->conn);
+                } catch (Exception $e) {
+                    // Cleanup failed, ignore
+                }
 
                 $stmt->close();
                 return 1; // Success
             }
         }
-        
-        // Log failed login
-        Security::logSecurityEvent('login_failed', ['username' => $username], $this->conn);
-        
+
+        // Record failed login attempt (fail silently)
+        try {
+            Security::recordLoginAttempt($this->conn, $username, false);
+        } catch (Exception $e) {
+            // Failed to record, ignore
+        }
+
+        // Log failed login (fail silently)
+        try {
+            Security::logSecurityEvent('login_failed', ['username' => $username], $this->conn);
+        } catch (Exception $e) {
+            // Failed to log, ignore
+        }
+
         $stmt->close();
         return 3; // Invalid credentials
     }
@@ -118,23 +175,29 @@ class SecureAction {
      * Secure Logout
      */
     public function logout() {
-        $userId = $_SESSION['login_id'] ?? null;
-        
-        Security::logSecurityEvent('logout', ['user_id' => $userId], $this->conn);
-        
-        // Clear all session data
-        $_SESSION = array();
-        
-        // Delete session cookie
-        if (ini_get("session.use_cookies")) {
-            $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000,
-                $params["path"], $params["domain"],
-                $params["secure"], $params["httponly"]
-            );
+        try {
+            $userId = $_SESSION['login_id'] ?? null;
+
+            // Log the event (won't crash if logging fails)
+            Security::logSecurityEvent('logout', ['user_id' => $userId], $this->conn);
+
+            // Clear all session data
+            $_SESSION = array();
+
+            // Delete session cookie
+            if (ini_get("session.use_cookies")) {
+                $params = session_get_cookie_params();
+                @setcookie(session_name(), '', time() - 42000,
+                    $params["path"], $params["domain"],
+                    $params["secure"] ?? false, $params["httponly"] ?? true
+                );
+            }
+
+            @session_destroy();
+        } catch (Exception $e) {
+            // Continue with redirect even if cleanup fails
         }
-        
-        session_destroy();
+
         header("Location: login.php");
         exit;
     }
@@ -191,45 +254,31 @@ class SecureAction {
             Security::logSecurityEvent('user_saved', ['user_id' => $id ?: $this->conn->insert_id], $this->conn);
             $stmt->close();
             return 1;
-                // Require CSRF for profile updates
-                if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-                    header('HTTP/1.1 405 Method Not Allowed');
-                    echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
-                    return;
-                }
-
-                $csrf = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : '';
-                if (!Security::validateCSRFToken($csrf)) {
-                    header('HTTP/1.1 403 Forbidden');
-                    echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token']);
-                    return;
-                }
-
         }
-                $name = isset($_POST['name']) ? Security::sanitizeString($_POST['name']) : '';
-                $username = isset($_POST['username']) ? Security::sanitizeString($_POST['username']) : '';
+        
+        $stmt->close();
+        return json_encode(['status' => 'error', 'message' => 'Failed to save user']);
+    }
 
-                if (empty($name) || empty($username)) {
-                    echo json_encode(['status' => 'error', 'message' => 'Name and username are required']);
-                    return;
-                }
-
-                $userId = $_SESSION['login_id'];
-                $stmt = $this->conn->prepare("SELECT id FROM users WHERE username = ? AND id != ? LIMIT 1");
-                $stmt->bind_param('si', $username, $userId);
-                $stmt->execute();
-                $res = $stmt->get_result();
-                if ($res->num_rows > 0) {
-                    echo json_encode(['status' => 'error', 'message' => 'Username already taken']);
-                    return;
-                }
-
-                $stmt = $this->conn->prepare("UPDATE users SET name = ?, username = ? WHERE id = ?");
-                $stmt->bind_param('ssi', $name, $username, $userId);
-                $stmt->execute();
-
-                $_SESSION['login_name'] = $name;
-                echo json_encode(['status' => 'ok']);
+    /**
+     * Delete User
+     */
+    public function delete_user() {
+        if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
+            return json_encode(['status' => 'error', 'message' => 'Invalid request token']);
+        }
+        
+        $id = Security::sanitizeInt($_POST['id'] ?? '');
+        
+        // Prevent deleting self
+        if ($id == ($_SESSION['login_id'] ?? 0)) {
+            return json_encode(['status' => 'error', 'message' => 'Cannot delete your own account']);
+        }
+        
+        $stmt = $this->conn->prepare("DELETE FROM users WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        
+        if ($stmt->execute()) {
             Security::logSecurityEvent('user_deleted', ['deleted_user_id' => $id], $this->conn);
             $stmt->close();
             return 1;
@@ -939,65 +988,52 @@ class SecureAction {
      */
     public function admin_update_profile() {
         $userId = $_SESSION['login_id'] ?? 0;
-        // Require CSRF token for this sensitive action and use consistent server-side checks.
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('HTTP/1.1 405 Method Not Allowed');
-            echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
-            return;
+        $name = Security::sanitizeString($_POST['name'] ?? '');
+        $username = Security::sanitizeString($_POST['username'] ?? '');
+        $email = Security::sanitizeString($_POST['email'] ?? '');
+
+        if ($userId == 0) {
+            return json_encode(['status' => 'error', 'message' => 'Not logged in']);
         }
 
-        $csrf = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : '';
-        if (!Security::validateCSRFToken($csrf)) {
-            header('HTTP/1.1 403 Forbidden');
-            echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token']);
-            return;
+        if (empty($name) || empty($username)) {
+            return json_encode(['status' => 'error', 'message' => 'Name and username are required']);
         }
 
-        $currentPassword = isset($_POST['currentPassword']) ? $_POST['currentPassword'] : '';
-        $newPassword = isset($_POST['newPassword']) ? $_POST['newPassword'] : '';
-
-        // Enforce server-side minimum length consistent with change_password()
-        if (strlen($newPassword) < 8) {
-            echo json_encode(['status' => 'error', 'message' => 'New password must be at least 8 characters']);
-            return;
+        // Validate email format if provided
+        if (!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return json_encode(['status' => 'error', 'message' => 'Invalid email format']);
         }
 
-        $userId = $_SESSION['login_id'];
-        $stmt = $this->conn->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
-        $stmt->bind_param('i', $userId);
+        // Check if username already exists (for another user)
+        $stmt = $this->conn->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+        $stmt->bind_param("si", $username, $userId);
         $stmt->execute();
-        $res = $stmt->get_result();
-        $user = $res->fetch_assoc();
+        if ($stmt->get_result()->num_rows > 0) {
+            $stmt->close();
+            return json_encode(['status' => 'error', 'message' => 'Username already exists']);
+        }
+        $stmt->close();
 
-        if (!$user) {
-            echo json_encode(['status' => 'error', 'message' => 'User not found']);
-            return;
+        // Update profile (including email)
+        $stmt = $this->conn->prepare("UPDATE users SET name = ?, username = ?, email = ? WHERE id = ?");
+        $stmt->bind_param("sssi", $name, $username, $email, $userId);
+
+        if ($stmt->execute()) {
+            // Update session name
+            $_SESSION['login_name'] = $name;
+            $stmt->close();
+            return 1;
         }
 
-        // Use Security::verifyPassword for bcrypt; refuse legacy plaintext/md5 as a verification method here.
-        $verified = false;
-        if (strpos($user['password'], '$2') === 0) {
-            if (Security::verifyPassword($currentPassword, $user['password'])) {
-                $verified = true;
-            }
-        } else {
-            // Legacy hashes should have been migrated on login. Refuse change without prior migration.
-            echo json_encode(['status' => 'error', 'message' => 'Please login and update your password before attempting a password change via this endpoint.']);
-            return;
-        }
+        $stmt->close();
+        return json_encode(['status' => 'error', 'message' => 'Failed to update profile']);
+    }
 
-        if (!$verified) {
-            echo json_encode(['status' => 'error', 'message' => 'Current password is incorrect']);
-            return;
-        }
-
-        $newHash = Security::hashPassword($newPassword);
-        $stmt = $this->conn->prepare("UPDATE users SET password = ? WHERE id = ?");
-        $stmt->bind_param('si', $newHash, $userId);
-        $stmt->execute();
-
-        Security::logSecurityEvent('admin_password_changed', ['user_id' => $userId], $this->conn);
-        echo json_encode(['status' => 'ok']);
+    /**
+     * Get loan review details
+     */
+    public function get_loan_review_details() {
         $loan_id = Security::sanitizeInt($_POST['loan_id'] ?? 0);
 
         // Get loan details

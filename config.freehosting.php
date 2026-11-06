@@ -1,6 +1,6 @@
 <?php
 /**
- * Free Hosting Configuration - Tenzy Investments Loan System
+ * Free Hosting Configuration - Basils Money Lenders Loan System
  *
  * FOR FREEHOSTING.ORG / INFINITYFREE / 000WEBHOST / SIMILAR
  *

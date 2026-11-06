@@ -156,10 +156,10 @@ nav#sidebar {
 				<a href="admin.php?page=payments" class="nav-item nav-payments"><span class='icon-field'><i class="fa fa-money-bill"></i></span> Payments</a>
 				<a href="admin.php?page=borrowers" class="nav-item nav-borrowers"><span class='icon-field'><i class="fa fa-user-friends"></i></span> Borrowers</a>
 				<a href="admin.php?page=customer_documents_admin" class="nav-item nav-customer_documents_admin"><span class='icon-field'><i class="fa fa-folder-open"></i></span> Customer Documents</a>
-				<a href="admin.php?page=plan" class="nav-item nav-plan"><span class='icon-field'><i class="fa fa-list-alt"></i></span> Loan Plans</a>
 				<a href="admin.php?page=loan_type" class="nav-item nav-loan_type"><span class='icon-field'><i class="fa fa-th-list"></i></span> Loan Types</a>
 				<?php if(isset($_SESSION['login_type']) && $_SESSION['login_type'] == 1): ?>
 				<a href="admin.php?page=users" class="nav-item nav-users"><span class='icon-field'><i class="fa fa-users"></i></span> Users</a>
+				<a href="admin.php?page=security_audit_log" class="nav-item nav-security_audit_log"><span class='icon-field'><i class="fa fa-shield-alt"></i></span> Security Audit Log</a>
 				<a href="admin.php?page=backup_export" class="nav-item nav-backup_export"><span class='icon-field'><i class="fa fa-database"></i></span> Backup & Export</a>
 			<?php endif; ?>
 				<a href="admin.php?page=admin_profile" class="nav-item nav-admin_profile"><span class='icon-field'><i class="fa fa-user-cog"></i></span> My Profile</a>
