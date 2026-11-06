@@ -1,0 +1,98 @@
+# Deploys this repo to basilsmoneylenders.com on Hostinger over FTPS.
+#
+# Safety rules:
+# - Uploads only files that changed since the last deploy (tracked in
+#   .ftp-deploy-sync-state.json on the server).
+# - Never touches the excluded paths below: customer uploads, logs, and the
+#   live database/SMTP config stay exactly as they are on the server.
+# - Never wipes the server folder (dangerous-clean-slate is off). A file is only
+#   removed from the server if a commit deletes it from this repo AND a previous
+#   run of this workflow uploaded it. Files that were already on the server
+#   before the first deploy are never removed.
+#
+# Setup (repo Settings -> Secrets and variables -> Actions):
+#   Secrets:   FTP_SERVER, FTP_USERNAME, FTP_PASSWORD
+#   Variables: FTP_SERVER_DIR  - folder of the site as seen by the FTP account,
+#                                ending in "/" (e.g. "public_html/" or
+#                                "domains/basilsmoneylenders.com/public_html/")
+#              DEPLOY_ENABLED  - set to "true" to deploy automatically on every
+#                                push to main. Until then, only manual runs work.
+#
+# Run it manually first with "dry run" ticked: it lists what it would upload
+# and changes nothing.
+
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: only list what would be uploaded, change nothing"
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-hostinger
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check deploy settings
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ vars.FTP_SERVER_DIR }}
+        run: |
+          missing=""
+          [ -z "$FTP_SERVER" ] && missing="$missing FTP_SERVER(secret)"
+          [ -z "$FTP_USERNAME" ] && missing="$missing FTP_USERNAME(secret)"
+          [ -z "$FTP_PASSWORD" ] && missing="$missing FTP_PASSWORD(secret)"
+          [ -z "$FTP_SERVER_DIR" ] && missing="$missing FTP_SERVER_DIR(variable)"
+          if [ -n "$missing" ]; then echo "::error::Missing:$missing"; exit 1; fi
+          case "$FTP_SERVER_DIR" in */) ;; *) echo "::error::FTP_SERVER_DIR must end with /"; exit 1;; esac
+
+      - uses: actions/checkout@v4
+
+      - name: Upload changed files
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          server-dir: ${{ vars.FTP_SERVER_DIR }}
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          dangerous-clean-slate: false
+          log-level: standard
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .github/**
+            .claude/**
+            **/node_modules/**
+            assets/uploads/**
+            uploads/**
+            logs/**
+            config/**
+            config.php
+            db_connect.php
+            config.production.php
+            config.freehosting.php
+            .env
+            *.env
+            database/**
+            *.md
+            Dockerfile
+            Dockerfil
+            debug_login.php
+            test_login.php
+            test_config.php
+            clear_rate_limit.php
