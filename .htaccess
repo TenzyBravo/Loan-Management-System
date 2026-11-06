@@ -1,5 +1,16 @@
-# Tenzy Investments Loan System
+# Basils Money Lenders Loan System
 # Apache Configuration for Production
+
+# ============================================================
+# MODSECURITY BYPASS FOR AJAX REQUESTS
+# ============================================================
+<IfModule mod_security.c>
+    SecRuleEngine Off
+</IfModule>
+
+<IfModule mod_security2.c>
+    SecRuleEngine Off
+</IfModule>
 
 # ============================================================
 # HTTPS REDIRECT (Uncomment for production)

@@ -41,15 +41,21 @@ $totalLoansValue = $conn->query("SELECT COALESCE(SUM(l.amount + (l.amount * (p.i
 $totalPayments = $conn->query("SELECT COALESCE(SUM(amount), 0) as total FROM payments")->fetch_assoc()['total'];
 $totalReceivable = $totalLoansValue - $totalPayments;
 
-// Overdue loans
-$overdueLoans = $conn->query("SELECT COUNT(DISTINCT l.id) as count 
-                               FROM loan_list l 
-                               INNER JOIN loan_schedules ls ON l.id = ls.loan_id 
-                               LEFT JOIN payments p ON l.id = p.loan_id 
-                               WHERE l.status = 2 
-                               AND ls.date_due < CURDATE()
-                               GROUP BY l.id
-                               HAVING COUNT(ls.id) > COALESCE(COUNT(p.id), 0)")->num_rows;
+// Overdue loans (check if loan_schedules table exists)
+$tableCheck = $conn->query("SHOW TABLES LIKE 'loan_schedules'");
+if ($tableCheck && $tableCheck->num_rows > 0) {
+    $overdueLoans = $conn->query("SELECT COUNT(DISTINCT l.id) as count
+                                   FROM loan_list l
+                                   INNER JOIN loan_schedules ls ON l.id = ls.loan_id
+                                   LEFT JOIN payments p ON l.id = p.loan_id
+                                   WHERE l.status = 2
+                                   AND ls.date_due < CURDATE()
+                                   GROUP BY l.id
+                                   HAVING COUNT(ls.id) > COALESCE(COUNT(p.id), 0)")->num_rows;
+} else {
+    // Table doesn't exist yet, set to 0
+    $overdueLoans = 0;
+}
 
 // Monthly payment data for chart (last 12 months)
 $monthlyPayments = [];
@@ -96,63 +102,71 @@ $stmt->execute();
 $deniedLoans = $stmt->get_result()->fetch_assoc()['c'];
 $stmt->close();
 
-// Overdue loans analysis by age
+// Overdue loans analysis by age (check if loan_schedules table exists)
 $overdueAnalysis = [];
-$overdueQuery = $conn->query("
-    SELECT
-        CASE
-            WHEN DATEDIFF(CURDATE(), ls.date_due) BETWEEN 1 AND 30 THEN '0-30 days'
-            WHEN DATEDIFF(CURDATE(), ls.date_due) BETWEEN 31 AND 60 THEN '31-60 days'
-            WHEN DATEDIFF(CURDATE(), ls.date_due) BETWEEN 61 AND 90 THEN '61-90 days'
-            WHEN DATEDIFF(CURDATE(), ls.date_due) > 90 THEN '90+ days'
-        END as age_range,
-        COUNT(DISTINCT l.id) as count,
-        COALESCE(SUM(l.monthly_installment), 0) as total_amount
-    FROM loan_list l
-    INNER JOIN loan_schedules ls ON l.id = ls.loan_id
-    LEFT JOIN payments p ON p.loan_id = l.id AND DATE(p.date_created) = ls.date_due
-    WHERE l.status = 2
-    AND ls.date_due < CURDATE()
-    AND p.id IS NULL
-    GROUP BY age_range
-    ORDER BY
-        CASE age_range
-            WHEN '0-30 days' THEN 1
-            WHEN '31-60 days' THEN 2
-            WHEN '61-90 days' THEN 3
-            WHEN '90+ days' THEN 4
-        END
-");
+$tableCheck = $conn->query("SHOW TABLES LIKE 'loan_schedules'");
+if ($tableCheck && $tableCheck->num_rows > 0) {
+    $overdueQuery = $conn->query("
+        SELECT
+            CASE
+                WHEN DATEDIFF(CURDATE(), ls.date_due) BETWEEN 1 AND 30 THEN '0-30 days'
+                WHEN DATEDIFF(CURDATE(), ls.date_due) BETWEEN 31 AND 60 THEN '31-60 days'
+                WHEN DATEDIFF(CURDATE(), ls.date_due) BETWEEN 61 AND 90 THEN '61-90 days'
+                WHEN DATEDIFF(CURDATE(), ls.date_due) > 90 THEN '90+ days'
+            END as age_range,
+            COUNT(DISTINCT l.id) as count,
+            COALESCE(SUM(l.monthly_installment), 0) as total_amount
+        FROM loan_list l
+        INNER JOIN loan_schedules ls ON l.id = ls.loan_id
+        LEFT JOIN payments p ON p.loan_id = l.id AND DATE(p.date_created) = ls.date_due
+        WHERE l.status = 2
+        AND ls.date_due < CURDATE()
+        AND p.id IS NULL
+        GROUP BY age_range
+        ORDER BY
+            CASE age_range
+                WHEN '0-30 days' THEN 1
+                WHEN '31-60 days' THEN 2
+                WHEN '61-90 days' THEN 3
+                WHEN '90+ days' THEN 4
+            END
+    ");
 
-if (!$overdueQuery) {
-    error_log("Overdue query failed: " . $conn->error);
-    $overdueAnalysis = [];
-} else {
-    while ($row = $overdueQuery->fetch_assoc()) {
-        $overdueAnalysis[] = $row;
+    if (!$overdueQuery) {
+        error_log("Overdue query failed: " . $conn->error);
+        $overdueAnalysis = [];
+    } else {
+        while ($row = $overdueQuery->fetch_assoc()) {
+            $overdueAnalysis[] = $row;
+        }
     }
 }
 
-// Collection rate calculation
-$collectionRateQuery = $conn->query("
-    SELECT
-        COUNT(DISTINCT ls.id) as total_schedules,
-        COUNT(DISTINCT CASE WHEN p.id IS NOT NULL THEN ls.id END) as paid_on_time
-    FROM loan_schedules ls
-    LEFT JOIN payments p ON ls.loan_id = p.loan_id
-        AND DATE(p.date_created) = ls.date_due
-    WHERE ls.date_due <= CURDATE()
-    AND ls.loan_id IN (SELECT id FROM loan_list WHERE status IN (2, 3))
-");
+// Collection rate calculation (check if loan_schedules table exists)
+$tableCheck = $conn->query("SHOW TABLES LIKE 'loan_schedules'");
+if ($tableCheck && $tableCheck->num_rows > 0) {
+    $collectionRateQuery = $conn->query("
+        SELECT
+            COUNT(DISTINCT ls.id) as total_schedules,
+            COUNT(DISTINCT CASE WHEN p.id IS NOT NULL THEN ls.id END) as paid_on_time
+        FROM loan_schedules ls
+        LEFT JOIN payments p ON ls.loan_id = p.loan_id
+            AND DATE(p.date_created) = ls.date_due
+        WHERE ls.date_due <= CURDATE()
+        AND ls.loan_id IN (SELECT id FROM loan_list WHERE status IN (2, 3))
+    ");
 
-if (!$collectionRateQuery) {
-    error_log("Collection rate query failed: " . $conn->error);
-    $collectionRate = 0;
+    if (!$collectionRateQuery) {
+        error_log("Collection rate query failed: " . $conn->error);
+        $collectionRate = 0;
+    } else {
+        $collectionStats = $collectionRateQuery->fetch_assoc();
+        $collectionRate = $collectionStats['total_schedules'] > 0
+            ? round(($collectionStats['paid_on_time'] / $collectionStats['total_schedules']) * 100, 1)
+            : 0;
+    }
 } else {
-    $collectionStats = $collectionRateQuery->fetch_assoc();
-    $collectionRate = $collectionStats['total_schedules'] > 0
-        ? round(($collectionStats['paid_on_time'] / $collectionStats['total_schedules']) * 100, 1)
-        : 0;
+    $collectionRate = 0;
 }
 
 // Recent activity
@@ -182,26 +196,29 @@ while ($row = $recentPaymentsResult->fetch_assoc()) {
 }
 $stmt->close();
 
-// Upcoming payments (next 7 days)
-$stmt = $conn->prepare("SELECT ls.*, l.ref_no, l.amount as loan_amount,
-                                   CONCAT(b.firstname, ' ', b.lastname) as borrower_name,
-                                   lp.months, lp.interest_percentage,
-                                   (l.amount + (l.amount * lp.interest_percentage / 100)) / lp.months as monthly_payment
-                                   FROM loan_schedules ls
-                                   INNER JOIN loan_list l ON ls.loan_id = l.id
-                                   INNER JOIN borrowers b ON l.borrower_id = b.id
-                                   INNER JOIN loan_plan lp ON l.plan_id = lp.id
-                                   WHERE l.status = 2
-                                   AND ls.date_due BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-                                   ORDER BY ls.date_due ASC
-                                   LIMIT 10");
-$stmt->execute();
-$upcomingPaymentsResult = $stmt->get_result();
+// Upcoming payments (next 7 days) (check if loan_schedules table exists)
 $upcomingPayments = [];
-while ($row = $upcomingPaymentsResult->fetch_assoc()) {
-    $upcomingPayments[] = $row;
+$tableCheck = $conn->query("SHOW TABLES LIKE 'loan_schedules'");
+if ($tableCheck && $tableCheck->num_rows > 0) {
+    $stmt = $conn->prepare("SELECT ls.*, l.ref_no, l.amount as loan_amount,
+                                       CONCAT(b.firstname, ' ', b.lastname) as borrower_name,
+                                       lp.months, lp.interest_percentage,
+                                       (l.amount + (l.amount * lp.interest_percentage / 100)) / lp.months as monthly_payment
+                                       FROM loan_schedules ls
+                                       INNER JOIN loan_list l ON ls.loan_id = l.id
+                                       INNER JOIN borrowers b ON l.borrower_id = b.id
+                                       INNER JOIN loan_plan lp ON l.plan_id = lp.id
+                                       WHERE l.status = 2
+                                       AND ls.date_due BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+                                       ORDER BY ls.date_due ASC
+                                       LIMIT 10");
+    $stmt->execute();
+    $upcomingPaymentsResult = $stmt->get_result();
+    while ($row = $upcomingPaymentsResult->fetch_assoc()) {
+        $upcomingPayments[] = $row;
+    }
+    $stmt->close();
 }
-$stmt->close();
 ?>
 
 <!-- Chart.js CDN -->
@@ -442,6 +459,11 @@ $stmt->close();
             <div class="col-md-8">
                 <h2 class="mb-1">Welcome back, <?php echo htmlspecialchars($_SESSION['login_name'] ?? 'Admin'); ?>!</h2>
                 <p class="mb-0 opacity-75">Here's what's happening with your loans today.</p>
+                <?php if (!empty($_SESSION['login_last_login'])): ?>
+                    <small style="opacity: 0.7;">
+                        <i class="fa fa-clock mr-1"></i> Last login: <?php echo date('M j, Y g:i A', strtotime($_SESSION['login_last_login'])); ?>
+                    </small>
+                <?php endif; ?>
             </div>
             <div class="col-md-4 text-right">
                 <p class="mb-0"><i class="fa fa-calendar-alt mr-2"></i><?php echo date('l, F j, Y'); ?></p>

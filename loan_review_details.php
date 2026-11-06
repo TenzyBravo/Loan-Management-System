@@ -42,11 +42,12 @@ $stmt->close();
 
 // Determine if interest rate needs to be set
 // BUSINESS RULE: 1-month loans = 18% TOTAL (auto-assigned)
-//                Multi-month loans = Admin must assign rate
+//                Multi-month loans = Admin must assign rate (can be changed during review)
 $duration_months = $loan['duration_months'] ?? 1;
 $is_one_month_loan = ($duration_months == 1);
-$needs_rate_assignment = (!$is_one_month_loan && ($loan['interest_rate'] ?? 0) == 0);
+$needs_rate_assignment = (!$is_one_month_loan); // Multi-month loans always allow rate assignment/change
 $auto_assigned_rate = $is_one_month_loan; // 1-month loans always auto-assigned 18%
+$current_rate = $loan['interest_rate'] ?? 0;
 ?>
 
 <style>
@@ -134,7 +135,15 @@ $auto_assigned_rate = $is_one_month_loan; // 1-month loans always auto-assigned 
                     </div>
                     <div class="col-md-12">
                         <div class="info-label">Purpose</div>
-                        <div class="info-value"><?php echo nl2br(htmlspecialchars($loan['purpose'])) ?></div>
+                        <div class="info-value">
+                            <?php
+                            if(empty($loan['purpose']) || $loan['purpose'] == '0') {
+                                echo '<em class="text-muted">No purpose specified</em>';
+                            } else {
+                                echo nl2br(htmlspecialchars($loan['purpose']));
+                            }
+                            ?>
+                        </div>
                     </div>
                     <div class="col-md-12">
                         <div class="info-label">Application Date</div>
@@ -154,27 +163,31 @@ $auto_assigned_rate = $is_one_month_loan; // 1-month loans always auto-assigned 
                         <br><small>This is applied to the full loan amount, not as an annual rate.</small>
                     </div>
                 <?php elseif($needs_rate_assignment): ?>
-                    <div class="alert alert-warning">
-                        <i class="fa fa-exclamation-triangle"></i>
-                        <strong>Action Required:</strong> This loan requires interest rate assignment (<?php echo $duration_months ?>-month loan)
-                        <br><small>Select the total interest rate to apply to this loan.</small>
-                    </div>
+                    <?php if($current_rate > 0): ?>
+                        <div class="alert alert-info">
+                            <i class="fa fa-info-circle"></i>
+                            <strong>Current Rate:</strong> <?php echo $current_rate ?>% TOTAL interest
+                            <br><small>You can change this rate below if needed.</small>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-warning">
+                            <i class="fa fa-exclamation-triangle"></i>
+                            <strong>Action Required:</strong> This loan requires interest rate assignment (<?php echo $duration_months ?>-month loan)
+                            <br><small>Select the total interest rate to apply to this loan.</small>
+                        </div>
+                    <?php endif; ?>
                     <div class="form-group">
-                        <label>Assign Total Interest Rate</label>
+                        <label>Assign/Change Total Interest Rate</label>
                         <select id="assign_interest_rate" class="form-control">
                             <option value="">Select Interest Rate</option>
-                            <option value="10.0">10% Total Interest</option>
-                            <option value="18.0">18% Total Interest</option>
-                            <option value="25.0">25% Total Interest</option>
-                            <option value="28.0">28% Total Interest</option>
-                            <option value="30.0">30% Total Interest</option>
-                            <option value="35.0">35% Total Interest</option>
-                            <option value="40.0">40% Total Interest</option>
+                            <option value="10.0" <?php echo $current_rate == 10.0 ? 'selected' : '' ?>>10% Total Interest</option>
+                            <option value="18.0" <?php echo $current_rate == 18.0 ? 'selected' : '' ?>>18% Total Interest</option>
+                            <option value="25.0" <?php echo $current_rate == 25.0 ? 'selected' : '' ?>>25% Total Interest</option>
+                            <option value="28.0" <?php echo $current_rate == 28.0 ? 'selected' : '' ?>>28% Total Interest</option>
+                            <option value="30.0" <?php echo $current_rate == 30.0 ? 'selected' : '' ?>>30% Total Interest</option>
+                            <option value="35.0" <?php echo $current_rate == 35.0 ? 'selected' : '' ?>>35% Total Interest</option>
+                            <option value="40.0" <?php echo $current_rate == 40.0 ? 'selected' : '' ?>>40% Total Interest</option>
                         </select>
-                    </div>
-                <?php else: ?>
-                    <div class="alert alert-info">
-                        <strong>Current Rate:</strong> <?php echo $loan['interest_rate'] ?? 0 ?>%
                     </div>
                 <?php endif; ?>
 
@@ -271,7 +284,7 @@ $auto_assigned_rate = $is_one_month_loan; // 1-month loans always auto-assigned 
             <div class="action-buttons text-right">
                 <form id="review-action-form">
                     <input type="hidden" name="loan_id" value="<?php echo $loan_id ?>">
-                    <input type="hidden" name="interest_rate" id="final_interest_rate" value="<?php echo $loan['interest_rate'] ?? 0 ?>">
+                    <input type="hidden" name="interest_rate" id="final_interest_rate" value="<?php echo $current_rate ?>">
 
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">
                         <i class="fa fa-times"></i> Cancel
@@ -281,7 +294,7 @@ $auto_assigned_rate = $is_one_month_loan; // 1-month loans always auto-assigned 
                         <i class="fa fa-ban"></i> Deny Application
                     </button>
 
-                    <button type="button" class="btn btn-success" onclick="approveLoan()" <?php echo $needs_rate_assignment ? 'id="approve-btn" disabled' : '' ?>>
+                    <button type="button" class="btn btn-success" onclick="approveLoan()" <?php echo ($needs_rate_assignment && $current_rate == 0) ? 'id="approve-btn" disabled' : 'id="approve-btn"' ?>>
                         <i class="fa fa-check"></i> Approve Loan
                     </button>
                 </form>
@@ -355,8 +368,8 @@ function rejectDocument(docId) {
 
 // Interest rate calculation preview
 <?php if($needs_rate_assignment): ?>
-$('#assign_interest_rate').change(function() {
-    const rate = parseFloat($(this).val());
+function updateCalculationPreview() {
+    const rate = parseFloat($('#assign_interest_rate').val());
     if(rate > 0) {
         const amount = <?php echo $loan['amount'] ?>;
         const months = <?php echo $loan['duration_months'] ?? 1 ?>;
@@ -379,6 +392,15 @@ $('#assign_interest_rate').change(function() {
         $('#calculation-preview').slideUp();
         $('#approve-btn').prop('disabled', true);
     }
+}
+
+$('#assign_interest_rate').change(updateCalculationPreview);
+
+// Show preview on page load if rate is already selected
+$(document).ready(function() {
+    <?php if($current_rate > 0): ?>
+        updateCalculationPreview();
+    <?php endif; ?>
 });
 <?php endif; ?>
 

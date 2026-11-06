@@ -1,4 +1,4 @@
-# Tenzy Investments - Production Deployment Checklist
+# Basils Money Lenders - Production Deployment Checklist
 
 ## Pre-Deployment Steps
 

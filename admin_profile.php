@@ -149,6 +149,15 @@ if(!$admin) {
                     <div class="info-value"><?php echo htmlspecialchars($admin['name']); ?></div>
                 </div>
                 <div class="info-row">
+                    <div class="info-label">Email</div>
+                    <div class="info-value">
+                        <?php echo htmlspecialchars($admin['email'] ?? 'Not set'); ?>
+                        <?php if(empty($admin['email'])): ?>
+                        <span class="badge badge-warning ml-2">Required for notifications</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="info-row">
                     <div class="info-label">Role</div>
                     <div class="info-value">
                         <span class="badge badge-primary"><?php echo $role; ?></span>
@@ -223,6 +232,15 @@ if(!$admin) {
                             <div class="form-group">
                                 <label>Username</label>
                                 <input type="text" class="form-control" name="username" id="profile_username" value="<?php echo htmlspecialchars($admin['username']); ?>" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Email Address <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" name="email" id="profile_email" value="<?php echo htmlspecialchars($admin['email'] ?? ''); ?>" required>
+                                <small class="form-text text-muted">Used for loan application notifications</small>
                             </div>
                         </div>
                     </div>

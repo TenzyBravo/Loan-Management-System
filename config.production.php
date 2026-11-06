@@ -1,6 +1,6 @@
 <?php
 /**
- * Production Configuration for Tenzy Investments Loan System
+ * Production Configuration for Basils Money Lenders Loan System
  *
  * INSTRUCTIONS:
  * 1. Copy this file to 'config.php' on your production server
@@ -27,7 +27,7 @@ define('DB_CHARSET', 'utf8mb4');
 // SITE CONFIGURATION [CHANGE THIS]
 // ============================================================
 define('BASE_URL', 'https://yourdomain.com/'); // [CHANGE THIS] Your domain with HTTPS
-define('SITE_NAME', 'Tenzy Investments');
+define('SITE_NAME', 'Basils Money Lenders');
 define('TIMEZONE', 'Africa/Lusaka');
 
 // ============================================================

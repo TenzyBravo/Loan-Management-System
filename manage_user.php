@@ -1,5 +1,10 @@
 <?php
 include('db_connect.php');
+require_once 'includes/security.php';
+
+// Generate CSRF token
+Security::generateCSRFToken();
+
 if(isset($_GET['id'])){
 	$id = $_GET['id'];
 	$stmt = $conn->prepare("SELECT * FROM users where id = ?");
@@ -13,9 +18,10 @@ if(isset($_GET['id'])){
 }
 ?>
 <div class="container-fluid">
-	
+
 	<form action="" id="manage-user">
 		<input type="hidden" name="id" value="<?php echo isset($meta['id']) ? $meta['id']: '' ?>">
+		<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token'] ?? ''; ?>">
 		<div class="form-group">
 			<label for="name">Name</label>
 			<input type="text" name="name" id="name" class="form-control" value="<?php echo isset($meta['name']) ? $meta['name']: '' ?>" required>
@@ -46,12 +52,25 @@ if(isset($_GET['id'])){
 			method:'POST',
 			data:$(this).serialize(),
 			success:function(resp){
-				if(resp ==1){
+				if(resp == 1){
 					alert_toast("Data successfully saved",'success')
 					setTimeout(function(){
 						location.reload()
 					},1500)
+				} else {
+					end_load()
+					// Try to parse JSON error response
+					try {
+						var error = JSON.parse(resp);
+						alert_toast(error.message || "An error occurred", 'error')
+					} catch(e) {
+						alert_toast("An error occurred: " + resp, 'error')
+					}
 				}
+			},
+			error:function(xhr, status, error){
+				end_load()
+				alert_toast("Error: " + error, 'error')
 			}
 		})
 	})

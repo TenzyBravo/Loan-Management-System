@@ -20,7 +20,7 @@ require_once __DIR__ . '/../db_connect.php';
 echo "<pre>\n";
 echo "===========================================\n";
 echo "Password Migration Script\n";
-echo "Tenzy Investments Loan System\n";
+echo "Basils Money Lenders Loan System\n";
 echo "===========================================\n\n";
 
 // Migrate admin/staff users

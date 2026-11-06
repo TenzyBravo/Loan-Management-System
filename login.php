@@ -17,7 +17,7 @@ include('./db_connect.php');
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
 
-	<title>Login | Tenzy Investments</title>
+  <title>Login | Basils Money Lenders</title>
  	
 
 </head>
@@ -75,14 +75,35 @@ div#login-right::before {
     height: calc(100%);
     background: #000000e0;
 }
-
+.home-link {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    color: #17a2b8;
+    text-decoration: none;
+    font-weight: 600;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+.home-link:hover {
+    background: #17a2b8;
+    color: white;
+    text-decoration: none;
+    transform: translateY(-2px);
+}
 </style>
 
 <body>
-
+  <a href="index.php" class="home-link">
+    <i class="fa fa-home"></i> Home
+  </a>
 
   <main id="main" class=" bg-info">
-   	<h1>Tenzy Investments</h1>
+  	<h1>Basils Money Lenders</h1>
   		<div id="login-left">
   		</div>
 
