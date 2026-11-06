@@ -40,6 +40,10 @@
     <FilesMatch "\.(log|sql|bak)$">
         Require all denied
     </FilesMatch>
+    # GitHub Actions FTP deploy bookkeeping file
+    <Files ".ftp-deploy-sync-state.json">
+        Require all denied
+    </Files>
 </IfModule>
 
 # Fallback for Apache 2.2
