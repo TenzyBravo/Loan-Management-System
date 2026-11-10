@@ -61,6 +61,8 @@ Options -Indexes
     RewriteRule ^includes/ - [F,L]
     RewriteRule ^logs/ - [F,L]
     RewriteRule ^config/ - [F,L]
+    RewriteRule ^database/ - [F,L]
+    RewriteRule ^setup_loan_columns\.php$ - [F,L]
 </IfModule>
 
 # ============================================================

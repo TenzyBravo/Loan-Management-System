@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/includes/auth_guard.php'; require_staff(); ?>
 <?php include('db_connect.php');?>
 
 <div class="container-fluid">
@@ -153,7 +154,7 @@
 	function delete_ltype($id){
 		start_load()
 		$.ajax({
-			url:'ajax.php?action=delete_loan-type',
+			url:'ajax.php?action=delete_loan_type',
 			method:'POST',
 			data:{id:$id},
 			success:function(resp){

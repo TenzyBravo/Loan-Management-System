@@ -106,6 +106,14 @@ class Security {
     }
     
     /**
+     * Read the CSRF token sent with the current request
+     * (form field, or the X-CSRF-Token header that admin.php adds to every jQuery AJAX call)
+     */
+    public static function getRequestCSRFToken() {
+        return $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    }
+
+    /**
      * Get CSRF token input field
      */
     public static function csrfField() {

@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/includes/auth_guard.php'; require_staff(); ?>
 <?php include 'db_connect.php' ?>
 <?php
 
@@ -17,7 +18,7 @@ if(isset($_GET['id'])){
 <div class="container-fluid">
 	<div class="col-lg-12">
 		<form id="manage-borrower">
-			<input type="hidden" name="id" value="<?php echo isset($_GET['id']) ? $_GET['id'] : '' ?>">
+			<input type="hidden" name="id" value="<?php echo isset($_GET['id']) ? (int)$_GET['id'] : '' ?>">
 			<div class="row">
 				<div class="col-md-4">
 					<div class="form-group">

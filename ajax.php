@@ -8,23 +8,27 @@ ob_start();
 
 // Include the secure action class
 require_once 'admin_class_secure.php';
+require_once __DIR__ . '/includes/auth_guard.php';
 
 $action = $_GET['action'] ?? '';
-$crud = new SecureAction();
 
-// Actions that don't require CSRF (read-only, login, or admin-only actions protected by session)
-$csrfExempt = [
-    'login', 'login2', 'logout', 'logout2',
-    'get_loan_review_details', 'approve_loan_application', 'deny_loan_application',
-    'delete_loan', 'delete_borrower', 'delete_payment', 'delete_loan_type', 'delete_plan', 'delete_user',
-    'update_document_status', 'save_payment', 'mark_loan_paid', 'apply_overdue_penalty',
-    'admin_change_password', 'admin_update_profile',
-    'check_session', 'extend_session'
-];
+// Actions reachable without a logged-in back-office user.
+// check_session / extend_session handle the logged-out case themselves.
+$publicActions = ['login', 'logout', 'check_session', 'extend_session'];
 
-// Validate CSRF for non-exempt actions
-if (!in_array($action, $csrfExempt) && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['csrf_token'] ?? '';
+// Actions restricted to administrators (login_type == 1)
+$adminOnlyActions = ['save_user', 'delete_user'];
+
+if (!in_array($action, $publicActions, true)) {
+    require_staff(in_array($action, $adminOnlyActions, true));
+}
+
+// Actions that don't require CSRF: login has no session yet; logout is a plain link
+$csrfExempt = ['login', 'logout'];
+
+// Every other POST must carry the session's CSRF token (form field or X-CSRF-Token header)
+if (!in_array($action, $csrfExempt, true) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $token = Security::getRequestCSRFToken();
     if (!Security::validateCSRFToken($token)) {
         http_response_code(403);
         echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token. Please refresh the page and try again.']);
@@ -32,6 +36,8 @@ if (!in_array($action, $csrfExempt) && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
+
+$crud = new SecureAction();
 
 // Route to appropriate action
 switch ($action) {

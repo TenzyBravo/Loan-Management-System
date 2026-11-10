@@ -1,7 +1,8 @@
 <?php
+if (php_sapi_name() !== 'cli') { http_response_code(403); exit('Run this script from the command line: php '.basename(__FILE__)); }
 /**
  * Setup script to add missing columns to loan_list table
- * Run this once: http://localhost/loan/setup_loan_columns.php
+ * Run this once from the command line: php setup_loan_columns.php
  */
 
 include 'db_connect.php';
