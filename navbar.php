@@ -172,7 +172,7 @@ nav#sidebar {
 
 </nav>
 <script>
-	$('.nav-<?php echo isset($_GET['page']) ? $_GET['page'] : '' ?>').addClass('active')
+	$('.nav-<?php echo preg_replace('/[^a-z_]/', '', $_GET['page'] ?? 'home') ?>').addClass('active')
 
 	// Mobile sidebar toggle functionality
 	function toggleSidebar() {

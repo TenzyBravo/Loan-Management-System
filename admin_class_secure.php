@@ -108,6 +108,10 @@ class SecureAction {
                 // Regenerate session ID to prevent fixation (after setting session data)
                 Security::regenerateSession();
 
+                // Issue a fresh CSRF token so one obtained before login can't be reused
+                unset($_SESSION['csrf_token']);
+                Security::updateActivity();
+
                 // Update last login timestamp and IP (fail silently if columns don't exist)
                 try {
                     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -207,7 +211,7 @@ class SecureAction {
      */
     public function save_user() {
         // CSRF validation
-        if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
+        if (!Security::validateCSRFToken(Security::getRequestCSRFToken())) {
             return json_encode(['status' => 'error', 'message' => 'Invalid request token']);
         }
         
@@ -264,7 +268,7 @@ class SecureAction {
      * Delete User
      */
     public function delete_user() {
-        if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
+        if (!Security::validateCSRFToken(Security::getRequestCSRFToken())) {
             return json_encode(['status' => 'error', 'message' => 'Invalid request token']);
         }
         
@@ -867,7 +871,7 @@ class SecureAction {
      * Change Password
      */
     public function change_password() {
-        if (!Security::validateCSRFToken($_POST['csrf_token'] ?? '')) {
+        if (!Security::validateCSRFToken(Security::getRequestCSRFToken())) {
             return json_encode(['status' => 'error', 'message' => 'Invalid request token']);
         }
         

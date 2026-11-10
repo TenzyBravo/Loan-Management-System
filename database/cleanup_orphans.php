@@ -1,9 +1,11 @@
 <?php
+if (php_sapi_name() !== 'cli') { http_response_code(403); exit('Run this script from the command line: php '.basename(__FILE__)); }
 /**
  * Cleanup Orphaned Records
  * Removes records that reference non-existent borrowers
  *
- * Run this: http://localhost/loan/database/cleanup_orphans.php
+ * Run this: php database/cleanup_orphans.php            (report only)
+ *          php database/cleanup_orphans.php --cleanup  (delete orphans)
  */
 
 require_once __DIR__ . '/../db_connect.php';
@@ -66,7 +68,7 @@ if ($orphanNotifCount > 0) {
 }
 
 // Check if cleanup requested
-if (isset($_GET['cleanup']) && $_GET['cleanup'] === 'yes') {
+if (in_array('--cleanup', $argv ?? [], true)) {
     echo "<h2>Cleanup Results</h2>";
 
     // Delete orphaned documents
@@ -115,7 +117,7 @@ if (isset($_GET['cleanup']) && $_GET['cleanup'] === 'yes') {
     echo "<div class='info' style='margin-top: 20px;'>Cleanup complete!</div>";
 } else {
     if ($orphanDocCount > 0 || $orphanNotifCount > 0) {
-        echo "<p style='margin-top: 20px;'><a href='?cleanup=yes' class='btn' onclick=\"return confirm('This will permanently delete orphaned records. Continue?');\">Clean Up Orphaned Records</a></p>";
+        echo "<p style='margin-top: 20px;'>Re-run with <code>--cleanup</code> to delete these records.</p>";
     }
 }
 

@@ -1,9 +1,6 @@
 <?php
-require_once __DIR__ . '/includes/security.php';
-Security::secureSession();
-
-if(!isset($_SESSION['login_id']))
-    header('location:login.php');
+require_once __DIR__ . '/includes/auth_guard.php';
+require_staff();
 ?>
 
 <!DOCTYPE html>
@@ -174,6 +171,11 @@ if(!isset($_SESSION['login_id']))
   </div>
 </body>
 <script>
+	// Send the CSRF token with every jQuery AJAX request (ajax.php checks it on all POSTs)
+	$.ajaxSetup({
+	  headers: { 'X-CSRF-Token': '<?php echo htmlspecialchars(Security::generateCSRFToken(), ENT_QUOTES) ?>' }
+	});
+
 	// Enhanced loading with modern spinner
 	window.start_load = function(message = 'Loading...'){
 	  var loader = '<div id="preloader2" class="preloader-modern"><div class="spinner"></div><p>' + message + '</p></div>';

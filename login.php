@@ -3,8 +3,10 @@
 session_start();
 
 // Check if already logged in
-if(isset($_SESSION['login_id']))
+if(isset($_SESSION['login_id'])) {
     header("location:admin.php?page=home");
+    exit;
+}
 
 include('./header.php');
 include('./db_connect.php');

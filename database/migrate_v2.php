@@ -1,9 +1,10 @@
 <?php
+if (php_sapi_name() !== 'cli') { http_response_code(403); exit('Run this script from the command line: php '.basename(__FILE__)); }
 /**
  * Database Migration Script v2
  * Updates database schema for TOTAL interest rate system
  *
- * Run this once: http://localhost/loan/database/migrate_v2.php
+ * Run this once from the command line: php database/migrate_v2.php
  *
  * Changes:
  * - Updates loan_plan table comments
