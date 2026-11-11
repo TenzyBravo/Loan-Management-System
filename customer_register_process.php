@@ -1,6 +1,7 @@
 <?php
 session_start();
 include('db_connect.php');
+require_once __DIR__ . '/includes/borrower_rules.php';
 
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     
@@ -45,6 +46,14 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit;
     }
     $stmt->close();
+
+    // One account per person: the same NRC, phone number or email can't register twice
+    $duplicate = findDuplicateBorrower($conn, (string) $email, (string) $contact_no, (string) $tax_id);
+    if ($duplicate !== null) {
+        $_SESSION['error_msg'] = duplicateBorrowerMessage($duplicate, true);
+        header('Location: customer_register.php');
+        exit;
+    }
     
     // Create uploads directory if it doesn't exist
     $upload_dir = 'assets/uploads/customer_documents/';

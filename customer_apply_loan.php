@@ -7,8 +7,12 @@ if(!isset($_SESSION['customer_id'])){
 
 include('db_connect.php');
 require_once __DIR__ . '/includes/finance.php';
+require_once __DIR__ . '/includes/borrower_rules.php';
 
 $customer_id = $_SESSION['customer_id'];
+
+// One loan at a time: hide the form while the customer has an open loan
+$open_loan = findOpenLoan($conn, (int) $customer_id);
 
 // Get customer info
 $stmt = $conn->prepare("SELECT * FROM borrowers WHERE id = ?");
@@ -306,6 +310,16 @@ $stmt->close();
                         </div>
                     <?php endif; ?>
 
+                    <?php if ($open_loan !== null): ?>
+                        <!-- One loan at a time: no form while a loan is open -->
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <?php echo openLoanMessage($open_loan, true); ?>
+                            <div class="mt-2">
+                                <a href="customer_my_loans.php" class="btn btn-primary btn-sm">View My Loans</a>
+                            </div>
+                        </div>
+                    <?php else: ?>
                     <div class="application-card">
                         <div class="card-header-custom">
                             <h4 class="mb-0"><i class="fas fa-file-contract"></i> Loan Application Form</h4>
@@ -465,6 +479,7 @@ $stmt->close();
 
                         </form>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

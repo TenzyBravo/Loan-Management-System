@@ -8,6 +8,7 @@ require_once __DIR__ . '/includes/security.php';
 require_once __DIR__ . '/includes/database.php';
 require_once __DIR__ . '/config/constants.php';
 require_once __DIR__ . '/includes/finance.php';
+require_once __DIR__ . '/includes/borrower_rules.php';
 require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/includes/notifications.php';
 
@@ -375,7 +376,13 @@ class SecureAction {
         $contact_no = Security::sanitizeString($_POST['contact_no'] ?? '');
         $email = Security::sanitizeEmail($_POST['email'] ?? '');
         $tax_id = Security::sanitizeString($_POST['tax_id'] ?? '');
-        
+
+        // One account per person
+        $duplicate = findDuplicateBorrower($this->conn, $email, $contact_no, $tax_id, (int) $id);
+        if ($duplicate !== null) {
+            return json_encode(['status' => 'error', 'message' => duplicateBorrowerMessage($duplicate, false)]);
+        }
+
         if (empty($id)) {
             $stmt = $this->conn->prepare("INSERT INTO borrowers (firstname, middlename, lastname, address, contact_no, email, tax_id, date_created) VALUES (?, ?, ?, ?, ?, ?, ?, UNIX_TIMESTAMP())");
             $stmt->bind_param("sssssss", $firstname, $middlename, $lastname, $address, $contact_no, $email, $tax_id);
@@ -433,6 +440,14 @@ class SecureAction {
         }
         if ($collateral_value !== null && $collateral_value < 0) {
             return json_encode(['status' => 'error', 'message' => 'Collateral value cannot be negative.']);
+        }
+
+        // One loan at a time (checked when creating a loan; editing an existing loan is never blocked)
+        if (empty($id) && $borrower_id > 0) {
+            $openLoan = findOpenLoan($this->conn, (int) $borrower_id);
+            if ($openLoan !== null) {
+                return json_encode(['status' => 'error', 'message' => openLoanMessage($openLoan, false)]);
+            }
         }
 
         // Monthly loans: if a plan is selected and duration not provided, fall back to plan months

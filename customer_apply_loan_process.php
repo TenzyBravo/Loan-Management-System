@@ -3,6 +3,7 @@ session_start();
 include('db_connect.php');
 include('includes/notifications.php');
 require_once __DIR__ . '/includes/finance.php';
+require_once __DIR__ . '/includes/borrower_rules.php';
 
 if(!isset($_SESSION['customer_id'])){
     header('location: customer_login.php');
@@ -33,6 +34,12 @@ $collateral_value       = $collateral_value_raw === '' ? null : (float) $collate
 
 // Predefined plans are no longer chosen by customers; keep the legacy default
 $plan_id = (int) ($_POST['plan_id'] ?? 1);
+
+// One loan at a time
+$open_loan = findOpenLoan($conn, $customer_id);
+if ($open_loan !== null) {
+    apply_fail(openLoanMessage($open_loan, true));
+}
 
 // ---------------------------------------------------------------
 // Validate input

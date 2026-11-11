@@ -81,7 +81,16 @@ if(isset($_GET['id'])){
 	 				setTimeout(function(e){
 	 					location.reload()
 	 				},1500)
+	 			} else {
+	 				var msg = "Error saving borrower data.";
+	 				try { msg = JSON.parse(resp).message || msg; } catch(e) {}
+	 				alert_toast(msg, "error");
+	 				end_load();
 	 			}
+	 		},
+	 		error:function(){
+	 			alert_toast("Error saving borrower data.", "error");
+	 			end_load();
 	 		}
 	 	})
 	 })
