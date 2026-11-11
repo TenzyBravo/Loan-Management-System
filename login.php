@@ -1,9 +1,11 @@
 <?php
-// Start session first
-session_start();
+// Start the session with the same rules as the admin pages (including the
+// inactivity timeout), so both pages always agree on whether you're logged in.
+require_once __DIR__ . '/includes/security.php';
+Security::secureSession();
 
 // Check if already logged in
-if(isset($_SESSION['login_id'])) {
+if(Security::isLoggedIn()) {
     header("location:admin.php?page=home");
     exit;
 }
