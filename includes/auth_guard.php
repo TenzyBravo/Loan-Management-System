@@ -18,7 +18,8 @@ if (!function_exists('require_staff')) {
      * @param bool $adminOnly Require login_type == 1 (Admin) rather than any staff user.
      */
     function require_staff(bool $adminOnly = false): void {
-        $loggedIn = !empty($_SESSION['login_id']);
+        // isset, not empty(): a user whose id is 0 is still logged in
+        $loggedIn = Security::isLoggedIn();
         $isAdmin  = $loggedIn && (int)($_SESSION['login_type'] ?? 0) === 1;
 
         if ($loggedIn && (!$adminOnly || $isAdmin)) {

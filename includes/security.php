@@ -247,7 +247,8 @@ class Security {
      * Check if user is logged in
      */
     public static function isLoggedIn() {
-        return isset($_SESSION['login_id']) && !empty($_SESSION['login_id']);
+        // Not empty(): a user id of 0 must still count as logged in
+        return isset($_SESSION['login_id']) && $_SESSION['login_id'] !== '';
     }
     
     /**

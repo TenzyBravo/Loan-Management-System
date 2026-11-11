@@ -5,7 +5,7 @@ require_once __DIR__ . '/includes/security.php';
 Security::secureSession();
 
 // Check if already logged in
-if(!empty($_SESSION['login_id'])) {
+if(Security::isLoggedIn()) {
     header("location:admin.php?page=home");
     exit;
 }
