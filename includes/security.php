@@ -194,9 +194,17 @@ class Security {
         if (isset($_SESSION['login_id'])) {
             $timeout = self::checkSessionTimeout();
             if (!$timeout['valid']) {
-                // Session expired - destroy it
+                // Session expired - wipe it and carry on with a brand-new, empty session.
+                // The new ID (sent as a new cookie) guarantees the old logged-in session
+                // can't be picked up again by another page, which caused a
+                // login.php <-> admin.php redirect loop.
                 self::destroySession();
+                session_id(session_create_id());
+                session_start();
+                $_SESSION['last_activity'] = time();
+                $_SESSION['last_regeneration'] = time();
                 // Don't redirect here, let the AJAX or page handle it
+                return;
             }
         }
 

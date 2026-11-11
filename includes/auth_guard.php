@@ -22,6 +22,8 @@ if (!function_exists('require_staff')) {
         $isAdmin  = $loggedIn && (int)($_SESSION['login_type'] ?? 0) === 1;
 
         if ($loggedIn && (!$adminOnly || $isAdmin)) {
+            // Sliding timeout: staff who keep working stay logged in
+            Security::updateActivity();
             return;
         }
 
