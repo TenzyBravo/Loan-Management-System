@@ -1,6 +1,7 @@
 <?php
 session_start();
 include 'db_connect.php';
+require_once __DIR__ . '/includes/finance.php';
 
 // Check if user is logged in and is admin
 if(!isset($_SESSION['login_id']) || !isset($_SESSION['login_type']) || $_SESSION['login_type'] != 1) {
@@ -123,7 +124,7 @@ if($type == 'borrowers') {
 
 // Export Loans
 if($type == 'loans') {
-    $headers = ['Loan ID', 'Reference No', 'Borrower ID', 'Loan Type', 'Plan (Months)', 'Principal Amount', 'Interest Rate %', 'Interest Amount', 'Total Payable', 'Duration Months', 'Purpose', 'Status', 'Date Created', 'Date Released'];
+    $headers = ['Loan ID', 'Reference No', 'Borrower ID', 'Loan Type', 'Plan (Months)', 'Principal Amount', 'Interest Rate %', 'Interest Amount', 'Total Payable', 'Term', 'Purpose', 'Collateral', 'Collateral Value (K)', 'Status', 'Date Created', 'Date Released'];
 
     $statuses = [0 => 'Pending', 1 => 'Approved', 2 => 'Released', 3 => 'Completed', 4 => 'Denied'];
 
@@ -156,8 +157,10 @@ if($type == 'loans') {
             $interest_rate,
             number_format($interest_amount, 2),
             number_format($total_payable, 2),
-            $row['duration_months'] ?? 1,
+            formatLoanTerm($row['duration_months'] ?? 1, $row['term_unit'] ?? 'month'),
             $row['purpose'],
+            $row['collateral_description'] ?? '',
+            isset($row['collateral_value']) ? number_format((float) $row['collateral_value'], 2) : '',
             $statuses[$row['status']] ?? 'Unknown',
             $row['date_created'],
             $row['date_released']

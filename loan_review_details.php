@@ -2,13 +2,14 @@
 session_start();
 include 'db_connect.php';
 require_once 'includes/helpers.php';
+require_once __DIR__ . '/includes/finance.php';
 
 if(!isset($_SESSION['login_id'])){
     echo '<div class="alert alert-danger">Unauthorized access</div>';
     exit;
 }
 
-$loan_id = $_GET['loan_id'] ?? 0;
+$loan_id = (int) ($_GET['loan_id'] ?? 0);
 
 // Get comprehensive loan details
 $stmt = $conn->prepare("
@@ -41,12 +42,22 @@ $documents = $stmt->get_result();
 $stmt->close();
 
 // Determine if interest rate needs to be set
-// BUSINESS RULE: 1-month loans = 18% TOTAL (auto-assigned)
-//                Multi-month loans = Admin must assign rate (can be changed during review)
-$duration_months = $loan['duration_months'] ?? 1;
-$is_one_month_loan = ($duration_months == 1);
-$needs_rate_assignment = (!$is_one_month_loan); // Multi-month loans always allow rate assignment/change
-$auto_assigned_rate = $is_one_month_loan; // 1-month loans always auto-assigned 18%
+// BUSINESS RULES: Weekly loans = fixed rate by length (15/20/25/30%)
+//                 1-month loans = 18% TOTAL (auto-assigned)
+//                 Multi-month loans = Admin must assign rate (can be changed during review)
+$duration_months = (int) ($loan['duration_months'] ?? 1);
+$term_unit = normalizeTermUnit($loan['term_unit'] ?? 'month');
+$is_weekly_loan = ($term_unit === 'week');
+$is_one_month_loan = (!$is_weekly_loan && $duration_months == 1);
+$auto_assigned_rate = ($is_weekly_loan || $is_one_month_loan); // Fixed by business rule
+$needs_rate_assignment = !$auto_assigned_rate; // Multi-month loans always allow rate assignment/change
+$fixed_rate = 0;
+if ($is_weekly_loan) {
+    try { $fixed_rate = weeklyRateFor($duration_months); } catch (Exception $e) { $fixed_rate = 0; }
+} elseif ($is_one_month_loan) {
+    $fixed_rate = 18.0;
+}
+$term_label = formatLoanTerm($duration_months, $term_unit);
 $current_rate = $loan['interest_rate'] ?? 0;
 ?>
 
@@ -131,7 +142,7 @@ $current_rate = $loan['interest_rate'] ?? 0;
                     </div>
                     <div class="col-md-6">
                         <div class="info-label">Duration</div>
-                        <div class="info-value"><?php echo $loan['duration_months'] ?? 'N/A' ?> months</div>
+                        <div class="info-value"><?php echo $term_label ?><?php echo $is_weekly_loan ? ' <span class="badge badge-info">Weekly</span>' : '' ?></div>
                     </div>
                     <div class="col-md-12">
                         <div class="info-label">Purpose</div>
@@ -146,6 +157,19 @@ $current_rate = $loan['interest_rate'] ?? 0;
                         </div>
                     </div>
                     <div class="col-md-12">
+                        <div class="info-label">Collateral</div>
+                        <div class="info-value">
+                            <?php if(!empty($loan['collateral_description'])): ?>
+                                <?php echo nl2br(htmlspecialchars($loan['collateral_description'])) ?>
+                                <?php if($loan['collateral_value'] !== null && $loan['collateral_value'] !== ''): ?>
+                                    <br><small class="text-muted">Estimated value: <?php echo formatCurrency($loan['collateral_value']) ?></small>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <em class="text-danger">No collateral recorded</em>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
                         <div class="info-label">Application Date</div>
                         <div class="info-value"><?php echo date('F d, Y g:i A', strtotime($loan['date_created'])) ?></div>
                     </div>
@@ -157,11 +181,18 @@ $current_rate = $loan['interest_rate'] ?? 0;
                 <h5 class="mb-3"><i class="fa fa-percent"></i> Interest Rate Assignment</h5>
 
                 <?php if($auto_assigned_rate): ?>
+                    <?php if($fixed_rate > 0): ?>
                     <div class="alert alert-success">
                         <i class="fa fa-check-circle"></i>
-                        <strong>Auto-Assigned Rate:</strong> 18% TOTAL interest (1-month loan)
-                        <br><small>This is applied to the full loan amount, not as an annual rate.</small>
+                        <strong>Fixed Rate:</strong> <?php echo $fixed_rate ?>% TOTAL interest (<?php echo $term_label ?> loan)
+                        <br><small>Set by loan length and applied to the full loan amount, not as an annual rate.<?php echo $is_weekly_loan ? ' Repaid in one payment at the end of the term.' : '' ?></small>
                     </div>
+                    <?php else: ?>
+                    <div class="alert alert-danger">
+                        <i class="fa fa-exclamation-circle"></i>
+                        <strong>Unsupported term:</strong> <?php echo $term_label ?> is not an offered weekly term. Deny this application or edit the loan.
+                    </div>
+                    <?php endif; ?>
                 <?php elseif($needs_rate_assignment): ?>
                     <?php if($current_rate > 0): ?>
                         <div class="alert alert-info">
@@ -213,7 +244,7 @@ $current_rate = $loan['interest_rate'] ?? 0;
                                     <td class="text-right"><strong id="preview-total">K 0.00</strong></td>
                                 </tr>
                                 <tr>
-                                    <td>Monthly Payment:</td>
+                                    <td><?php echo $is_weekly_loan ? 'Single Repayment (due ' . $term_label . ' after release):' : ($is_one_month_loan ? 'Repayment (after 1 month):' : 'Monthly Payment:') ?></td>
                                     <td class="text-right"><strong id="preview-monthly">K 0.00</strong></td>
                                 </tr>
                             </table>
@@ -405,12 +436,16 @@ $(document).ready(function() {
 <?php endif; ?>
 
 <?php if($auto_assigned_rate): ?>
-// Show calculation preview for 1-month loans (auto 18%)
+// Show calculation preview for fixed-rate loans (weekly, or 1-month at 18%)
 $(document).ready(function() {
-    const amount = <?php echo $loan['amount'] ?>;
-    const rate = 18;
+    const amount = <?php echo (float) $loan['amount'] ?>;
+    const rate = <?php echo (float) $fixed_rate ?>;
+    if (!rate) {
+        $('#approve-btn').prop('disabled', true);
+        return;
+    }
 
-    // For 1-month loans: 18% is TOTAL interest, not annual
+    // TOTAL interest on the principal, not annual; repaid in one payment
     const totalInterest = amount * (rate / 100);
     const totalPayable = amount + totalInterest;
 
@@ -420,7 +455,7 @@ $(document).ready(function() {
     $('#preview-monthly').text('K ' + totalPayable.toLocaleString('en-US', {minimumFractionDigits: 2}));
 
     $('#calculation-preview').show();
-    $('#final_interest_rate').val(18);
+    $('#final_interest_rate').val(rate);
 });
 <?php endif; ?>
 

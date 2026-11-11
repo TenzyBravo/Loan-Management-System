@@ -6,6 +6,7 @@ if(!isset($_SESSION['customer_id'])){
 }
 
 include('db_connect.php');
+require_once __DIR__ . '/includes/finance.php';
 
 $customer_id = $_SESSION['customer_id'];
 
@@ -353,58 +354,71 @@ $stmt->close();
                                           placeholder="Describe the purpose of this loan..." required></textarea>
                             </div>
 
-                            <!-- Duration Selection -->
+                            <!-- Repayment Term -->
                             <div class="form-group">
                                 <label class="form-label">
-                                    <i class="fas fa-calendar-alt"></i> Loan Duration (Months) *
+                                    <i class="fas fa-calendar-alt"></i> Repayment Term *
                                 </label>
-                                <input type="number" class="form-control" name="duration_months" id="duration_months"
-                                       placeholder="Enter loan duration in months" min="1" max="120" required>
-                                <small class="form-text text-muted">Enter the number of months for loan repayment</small>
+                                <select class="form-control" name="term_choice" id="term_choice" required>
+                                    <option value="">Select repayment term</option>
+                                    <optgroup label="Weekly loans - fixed rate, one repayment at the end">
+                                        <?php foreach (AppConfig::WEEKLY_RATES as $weeks => $rate): ?>
+                                            <option value="week:<?php echo $weeks; ?>" data-rate="<?php echo $rate; ?>" data-count="<?php echo $weeks; ?>" data-unit="week">
+                                                <?php echo formatLoanTerm($weeks, 'week'); ?> - <?php echo rtrim(rtrim(number_format($rate, 2), '0'), '.'); ?>% total interest
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
+                                    <optgroup label="Monthly loans">
+                                        <option value="month:1" data-rate="18" data-count="1" data-unit="month">1 month - 18% total interest</option>
+                                        <option value="month:multi" data-unit="month">2 or more months - rate set by our team</option>
+                                    </optgroup>
+                                </select>
                             </div>
 
-                            <!-- Predefined Loan Plans (for reference only) -->
+                            <div class="form-group" id="months-group" style="display: none;">
+                                <label class="form-label">
+                                    <i class="fas fa-hourglass-half"></i> Number of Months *
+                                </label>
+                                <input type="number" class="form-control" name="duration_months" id="duration_months"
+                                       placeholder="Enter number of months" min="2" max="120">
+                                <small class="form-text text-muted">Loans of 2 or more months are repaid monthly; the interest rate is set by our team after review.</small>
+                            </div>
+
+                            <!-- Current Rates (reference) -->
+                            <div class="form-group">
+                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #d1fae5; border-left: 4px solid #10b981;">
+                                    <h6 class="mb-2"><i class="fas fa-percent text-success"></i> Current Rates <small class="text-muted">(effective 1 November 2026)</small></h6>
+                                    <div class="row text-center">
+                                        <?php foreach (AppConfig::WEEKLY_RATES as $weeks => $rate): ?>
+                                            <div class="col-6 col-md-3 mb-2">
+                                                <h5 class="mb-0"><?php echo rtrim(rtrim(number_format($rate, 2), '0'), '.'); ?>%</h5>
+                                                <small class="text-muted"><?php echo formatLoanTerm($weeks, 'week'); ?></small>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <small class="text-muted">
+                                        1-month loans: 18% total interest. 2+ month loans: rate set after review.
+                                        <strong>All loans are collateral based.</strong>
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- Collateral -->
                             <div class="form-group">
                                 <label class="form-label">
-                                    <i class="fas fa-list"></i> Available Loan Plans (Reference Only)
+                                    <i class="fas fa-shield-alt"></i> Collateral Offered *
                                 </label>
+                                <textarea class="form-control" name="collateral_description" id="collateral_description" rows="3"
+                                          placeholder="Describe the item(s) you are offering as collateral, e.g. Toyota Corolla 2012, reg. ABC 1234" required></textarea>
+                                <small class="form-text text-muted">All loans are collateral based. Our team will verify the collateral before approval.</small>
+                            </div>
 
-                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #d1fae5; border-left: 4px solid #10b981;">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <h5 class="mb-1"><i class="fas fa-check-circle text-success"></i> 1 Month</h5>
-                                            <small class="text-muted">Payment Period</small>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h5 class="mb-1">18% Total</h5>
-                                            <small class="text-success"><strong>Fixed Rate (Auto-Applied)</strong></small>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h5 class="mb-1">5%</h5>
-                                            <small class="text-muted">Penalty Rate</small>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #fff3cd; border-left: 4px solid #f59e0b;">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <h5 class="mb-1"><i class="fas fa-clock text-warning"></i> 2+ Months</h5>
-                                            <small class="text-muted">Payment Period</small>
-                                        </div>
-                                        <div class="col-md-8">
-                                            <h5 class="mb-1">Rate Determined by Administrator</h5>
-                                            <small class="text-warning"><strong>Total interest rate (10-40%) assigned based on credit assessment</strong></small>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <small class="form-text text-muted">
-                                    <i class="fas fa-info-circle"></i>
-                                    <strong>Interest Rate Policy:</strong><br>
-                                    • <strong>1-month loans:</strong> Fixed 18% total interest (automatically applied)<br>
-                                    • <strong>Multi-month loans:</strong> Total interest rate (10-40%) determined by administrator based on credit assessment
-                                </small>
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <i class="fas fa-coins"></i> Estimated Collateral Value (K) <small class="text-muted">(optional)</small>
+                                </label>
+                                <input type="number" class="form-control" name="collateral_value" id="collateral_value"
+                                       placeholder="Estimated value in Kwacha" min="0" step="0.01">
                             </div>
 
                             <!-- Loan Calculation Display -->
@@ -415,7 +429,7 @@ $stmt->close();
                                     <span id="calc-principal">K 0.00</span>
                                 </div>
                                 <div class="calc-item">
-                                    <span>Interest (<span id="calc-interest-rate">0</span>%):</span>
+                                    <span>Interest (<span id="calc-interest-rate">0</span>):</span>
                                     <span id="calc-interest">K 0.00</span>
                                 </div>
                                 <div class="calc-item">
@@ -423,7 +437,7 @@ $stmt->close();
                                     <span id="calc-total">K 0.00</span>
                                 </div>
                                 <div class="calc-item">
-                                    <span>Monthly Payment (<span id="calc-months">0</span> months):</span>
+                                    <span id="calc-installment-label">Repayment:</span>
                                     <span id="calc-monthly">K 0.00</span>
                                 </div>
                             </div>
@@ -460,74 +474,73 @@ $stmt->close();
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
-        // Calculate loan when amount or duration changes
-        $('#loan_amount, #duration_months').on('change', function(){
+        // Show the months field only for 2+ month loans
+        $('#term_choice').on('change', function(){
+            var isMulti = $(this).val() === 'month:multi';
+            $('#months-group').toggle(isMulti);
+            $('#duration_months').prop('required', isMulti);
             calculateLoan();
         });
 
+        // Recalculate when amount or months change
+        $('#loan_amount, #duration_months').on('change keyup', function(){
+            calculateLoan();
+        });
+
+        function formatK(value) {
+            return 'K ' + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
         function calculateLoan() {
+            // Display only - the server recalculates every figure on submission
             var amount = parseFloat($('#loan_amount').val());
-            var durationMonths = parseInt($('#duration_months').val());
+            var option = $('#term_choice option:selected');
+            var choice = option.val();
 
-            if(amount && durationMonths) {
-                // BUSINESS RULE: Interest rate based on DURATION, not amount
-                var interestRate;
-                var rateNote;
-                var canCalculate = true;
-
-                if(durationMonths === 1) {
-                    // 1-month loans: ALWAYS 18% (auto-applied)
-                    interestRate = 18.0;
-                    rateNote = '18% (Fixed for 1-month loans)';
-                } else {
-                    // Multi-month loans: Rate determined by administrator
-                    // Show message instead of estimating
-                    canCalculate = false;
-                }
-
-                if(canCalculate) {
-                    // Calculate using simple interest (only for 1-month loans)
-                    // For 1-month loans: 18% is the TOTAL interest, not annual
-                    var totalInterest = amount * (interestRate / 100); // Direct percentage
-                    var totalAmount = amount + totalInterest;
-                    var monthlyPayment = totalAmount / durationMonths;
-
-                    // Display calculations
-                    $('#calc-principal').text('K ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                    $('#calc-interest-rate').text(rateNote);
-                    $('#calc-interest').text('K ' + totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                    $('#calc-total').text('K ' + totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                    $('#calc-months').text(durationMonths);
-                    $('#calc-monthly').text('K ' + monthlyPayment.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-
-                    // Change calculation box styling to success (green) for 1-month loans
-                    $('#calculation-box').css({
-                        'background': '#d1fae5',
-                        'border-left': '4px solid #10b981'
-                    });
-                    $('#calculation-box h5').css('color', '#059669');
-                } else {
-                    // For multi-month loans, show informational message
-                    $('#calc-principal').text('K ' + amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
-                    $('#calc-interest-rate').text('To be determined by administrator');
-                    $('#calc-interest').html('<em>Pending admin review</em>');
-                    $('#calc-total').html('<em>Will be calculated after rate assignment</em>');
-                    $('#calc-months').text(durationMonths);
-                    $('#calc-monthly').html('<em>Pending admin review</em>');
-
-                    // Change calculation box styling to warning (yellow) for multi-month loans
-                    $('#calculation-box').css({
-                        'background': '#fff3cd',
-                        'border-left': '4px solid #f59e0b'
-                    });
-                    $('#calculation-box h5').html('<i class="fas fa-info-circle"></i> Loan Information');
-                    $('#calculation-box h5').css('color', '#f57c00');
-                }
-
-                $('#calculation-box').slideDown();
-            } else {
+            if(!amount || !choice) {
                 $('#calculation-box').slideUp();
+                return;
             }
+
+            var rate = parseFloat(option.data('rate'));
+            var unit = option.data('unit');
+
+            if(choice === 'month:multi') {
+                var months = parseInt($('#duration_months').val());
+                $('#calc-principal').text(formatK(amount));
+                $('#calc-interest-rate').text('rate set by our team after review');
+                $('#calc-interest').html('<em>Pending review</em>');
+                $('#calc-total').html('<em>Calculated once the rate is set</em>');
+                $('#calc-installment-label').text('Monthly Payment' + (months ? ' (' + months + ' months):' : ':'));
+                $('#calc-monthly').html('<em>Pending review</em>');
+                $('#calculation-box').css({'background': '#fff3cd', 'border-left': '4px solid #f59e0b'});
+                $('#calculation-box h5').html('<i class="fas fa-info-circle"></i> Loan Information').css('color', '#f57c00');
+            } else {
+                var count = parseInt(option.data('count'));
+                // TOTAL interest on the principal (not annual)
+                var totalInterest = amount * (rate / 100);
+                var totalAmount = amount + totalInterest;
+
+                $('#calc-principal').text(formatK(amount));
+                $('#calc-interest-rate').text(rate + '% total');
+                $('#calc-interest').text(formatK(totalInterest));
+                $('#calc-total').text(formatK(totalAmount));
+
+                if(unit === 'week') {
+                    var due = new Date();
+                    due.setDate(due.getDate() + count * 7);
+                    $('#calc-installment-label').text('One repayment, due ' + count + ' week' + (count > 1 ? 's' : '') + ' after release (about ' + due.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) + '):');
+                    $('#calc-monthly').text(formatK(totalAmount));
+                } else {
+                    $('#calc-installment-label').text('Repayment after 1 month:');
+                    $('#calc-monthly').text(formatK(totalAmount));
+                }
+
+                $('#calculation-box').css({'background': '#d1fae5', 'border-left': '4px solid #10b981'});
+                $('#calculation-box h5').html('<i class="fas fa-calculator"></i> Loan Calculation').css('color', '#059669');
+            }
+
+            $('#calculation-box').slideDown();
         }
 
         // Form validation
@@ -535,6 +548,11 @@ $stmt->close();
             if(!$('input[name="terms"]').is(':checked')) {
                 e.preventDefault();
                 alert('Please accept the terms and conditions');
+                return false;
+            }
+            if(!$.trim($('#collateral_description').val())) {
+                e.preventDefault();
+                alert('All loans are collateral based. Please describe the collateral you are offering.');
                 return false;
             }
         });

@@ -6,6 +6,7 @@ if(!isset($_SESSION['customer_id'])){
 }
 
 include('db_connect.php');
+require_once __DIR__ . '/includes/finance.php';
 
 $customer_id = $_SESSION['customer_id'];
 
@@ -312,13 +313,17 @@ $stmt->close();
         <!-- Loans List -->
         <?php if($loans_result && $loans_result->num_rows > 0): ?>
             <?php while($loan = $loans_result->fetch_assoc()): 
-                // Calculate monthly payment for display only
-                $monthly_payment = 0;
-                if($loan['months'] > 0) {
+                // Use the loan's own term, rate and stored totals (display only)
+                $loan_unit = normalizeTermUnit($loan['term_unit'] ?? 'month');
+                $loan_count = max(1, (int) ($loan['duration_months'] ?? ($loan['months'] ?? 1)));
+                $loan_rate = (float) ($loan['interest_rate'] ?? 0);
+                $monthly_payment = (float) ($loan['monthly_installment'] ?? 0);
+                if($monthly_payment <= 0 && $loan['months'] > 0) {
                     $interest = $loan['amount'] * ($loan['interest_percentage'] / 100);
                     $total_payable = $loan['amount'] + $interest;
                     $monthly_payment = $total_payable / $loan['months'];
                 }
+                $rate_pending = ($loan_rate <= 0 && $loan['status'] == 0);
                 
                 // Status display
                 $status_text = 'Pending';
@@ -375,18 +380,18 @@ $stmt->close();
                     </div>
                     
                     <div class="detail-item">
-                        <div class="detail-label">Payment Plan</div>
-                        <div class="detail-value"><?php echo $loan['months']; ?> months</div>
+                        <div class="detail-label">Repayment Term</div>
+                        <div class="detail-value"><?php echo formatLoanTerm($loan_count, $loan_unit); ?></div>
                     </div>
-                    
+
                     <div class="detail-item">
                         <div class="detail-label">Interest Rate</div>
-                        <div class="detail-value"><?php echo $loan['interest_percentage']; ?>%</div>
+                        <div class="detail-value"><?php echo $rate_pending ? 'Pending review' : (($loan_rate > 0 ? $loan_rate : $loan['interest_percentage']) . '% total'); ?></div>
                     </div>
-                    
+
                     <div class="detail-item">
-                        <div class="detail-label">Monthly Payment</div>
-                        <div class="detail-value">K <?php echo number_format($monthly_payment, 2); ?></div>
+                        <div class="detail-label"><?php echo $loan_unit === 'week' ? 'Amount Due' : 'Monthly Payment'; ?></div>
+                        <div class="detail-value"><?php echo $rate_pending ? 'Pending review' : 'K ' . number_format($monthly_payment, 2); ?></div>
                     </div>
                     
                     <div class="detail-item">

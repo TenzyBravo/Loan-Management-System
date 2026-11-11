@@ -6,6 +6,7 @@ if(!isset($_SESSION['customer_id'])){
 }
 
 include('db_connect.php');
+require_once __DIR__ . '/includes/finance.php';
 include('includes/notifications.php');
 include('includes/security.php');
 
@@ -612,6 +613,8 @@ $stmt->close();
                             $progress = $total_payable > 0 ? ($total_paid / $total_payable) * 100 : 0;
                             $monthly = $active_loan['monthly_installment'] > 0 ? $active_loan['monthly_installment'] : $total_payable;
                             $duration = $active_loan['duration_months'] > 0 ? $active_loan['duration_months'] : 1;
+                            $active_unit = normalizeTermUnit($active_loan['term_unit'] ?? 'month');
+                            $installments_total = $active_unit === 'week' ? 1 : $duration;
                             ?>
                             <div class="row mb-3">
                                 <div class="col-6 col-md-3 mb-2">
@@ -661,14 +664,14 @@ $stmt->close();
                                 </div>
                                 <div class="col-md-4 mb-2">
                                     <div class="info-box">
-                                        <small>Monthly Installment</small>
+                                        <small><?php echo $active_unit === 'week' ? 'Amount Due (' . formatLoanTerm($duration, 'week') . ' loan)' : 'Monthly Installment'; ?></small>
                                         <h5>K <?php echo number_format($monthly, 2); ?></h5>
                                     </div>
                                 </div>
                                 <div class="col-md-4 mb-2">
                                     <div class="info-box">
                                         <small>Payments Made</small>
-                                        <h5><?php echo $active_loan['payments_made']; ?> of <?php echo $duration; ?></h5>
+                                        <h5><?php echo $active_loan['payments_made']; ?> of <?php echo $installments_total; ?></h5>
                                     </div>
                                 </div>
                             </div>

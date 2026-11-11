@@ -2,6 +2,7 @@
 <?php
 include 'db_connect.php';
 require_once 'includes/helpers.php';
+require_once __DIR__ . '/includes/finance.php';
 
 $id = $_POST['id'] ?? null;
 $loan_id = $_POST['loan_id'] ?? null;
@@ -37,15 +38,30 @@ foreach($loan->fetch_array() as $k => $v){
 }
 $stmt->close();
 
-// Calculate totals using the actual loan data
-$annual_rate = $meta['interest_rate'];
-$months = $meta['duration_months'];
-$monthly_rate = $annual_rate / 12 / 100;
+// Use the totals stored on the loan (TOTAL interest, set when the loan was approved)
+$annual_rate = $meta['interest_rate']; // TOTAL rate (variable name kept for the template below)
+$months = max(1, (int) $meta['duration_months']); // count of term units
+$term_unit = normalizeTermUnit($meta['term_unit'] ?? 'month');
+$term_label = formatLoanTerm($months, $term_unit);
 
-// Use simple interest calculation
-$total_interest = $meta['amount'] * $monthly_rate * $months;
-$total_payable = $meta['amount'] + $total_interest;
-$monthly = $total_payable / $months;
+$total_payable = (float) $meta['total_payable'];
+$monthly = (float) $meta['monthly_installment'];
+if ($total_payable <= 0) {
+	// Older loans without stored totals: recalculate with the same rules used at approval
+	try {
+		$calc = calculateLoanForTerm((float) $meta['amount'], (float) $annual_rate, $months, $term_unit);
+		$total_payable = $calc['total_payable'];
+		$monthly = $calc['monthly_installment'];
+	} catch (Exception $e) {
+		$total_payable = (float) $meta['amount'];
+		$monthly = $total_payable / $months;
+	}
+}
+if ($monthly <= 0) {
+	$monthly = $term_unit === 'week' ? $total_payable : $total_payable / $months;
+}
+$installment_count = $term_unit === 'week' ? 1 : $months;
+$installment_word = $term_unit === 'week' ? 'Repayment' : 'Monthly Payment';
 
 // Get penalty rate from loan_plan if exists
 $penalty_rate = 5; // Default 5%
@@ -93,7 +109,7 @@ $penalty_amount = $is_overdue ? $penalty : 0;
 
 // Calculate remaining balance
 $remaining_balance = $total_payable - $sum_paid;
-$payment_progress = ($sum_paid / $total_payable) * 100;
+$payment_progress = $total_payable > 0 ? ($sum_paid / $total_payable) * 100 : 0;
 
 ?>
 <style>
@@ -323,7 +339,7 @@ $payment_progress = ($sum_paid / $total_payable) * 100;
 			</div>
 			<div class="loan-info-item">
 				<div class="loan-info-label">Duration</div>
-				<div class="loan-info-value"><?php echo $months ?> months</div>
+				<div class="loan-info-value"><?php echo $term_label ?></div>
 			</div>
 			<div class="loan-info-item">
 				<div class="loan-info-label">Total Payable</div>
@@ -345,7 +361,7 @@ $payment_progress = ($sum_paid / $total_payable) * 100;
 		<div class="progress-details">
 			<span><strong>Paid:</strong> <?php echo formatCurrency($sum_paid) ?></span>
 			<span><strong>Remaining:</strong> <?php echo formatCurrency($remaining_balance) ?></span>
-			<span><strong>Payments Made:</strong> <?php echo $paid_count ?> of <?php echo $months ?></span>
+			<span><strong>Payments Made:</strong> <?php echo $paid_count ?> of <?php echo $installment_count ?></span>
 		</div>
 	</div>
 </div>
@@ -366,7 +382,7 @@ $payment_progress = ($sum_paid / $total_payable) * 100;
 	<!-- Quick Amount Buttons -->
 	<div class="quick-amount-buttons">
 		<button type="button" class="quick-amount-btn" data-amount="<?php echo $monthly ?>">
-			<span class="amount-label">Monthly Payment</span>
+			<span class="amount-label"><?php echo $installment_word ?></span>
 			<span class="amount-value"><?php echo formatCurrency($monthly) ?></span>
 		</button>
 
@@ -391,7 +407,7 @@ $payment_progress = ($sum_paid / $total_payable) * 100;
 	<!-- Payment Summary -->
 	<div class="payment-summary">
 		<div class="payment-summary-item">
-			<span>Monthly Payment:</span>
+			<span><?php echo $installment_word ?>:</span>
 			<strong><?php echo formatCurrency($monthly) ?></strong>
 		</div>
 		<?php if($is_overdue): ?>

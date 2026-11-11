@@ -249,7 +249,10 @@ CREATE TABLE `loan_list` (
   `total_payable` decimal(15,2) DEFAULT 0.00 COMMENT 'Principal + Total Interest',
   `monthly_installment` decimal(15,2) DEFAULT 0.00 COMMENT 'Total Payable / Duration Months',
   `outstanding_balance` decimal(15,2) DEFAULT 0.00 COMMENT 'Remaining balance to be paid',
-  `duration_months` int(11) DEFAULT 1 COMMENT 'Loan duration in months'
+  `duration_months` int(11) DEFAULT 1 COMMENT 'Loan duration (number of term_unit units)',
+  `term_unit` varchar(5) NOT NULL DEFAULT 'month' COMMENT 'month or week',
+  `collateral_description` text DEFAULT NULL,
+  `collateral_value` decimal(15,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

@@ -2,6 +2,7 @@
 <?php
 include 'db_connect.php';
 require_once 'includes/helpers.php';
+require_once __DIR__ . '/includes/finance.php';
 
 // Get all active loans (status = 1 Approved OR status = 2 Released) with borrower info
 $loans_query = $conn->query("
@@ -17,6 +18,7 @@ $loans_query = $conn->query("
         l.date_released,
         l.date_created,
         l.duration_months,
+        l.term_unit,
         l.status,
         CONCAT(b.lastname, ', ', b.firstname) as borrower_name,
         b.contact_no,
@@ -253,14 +255,16 @@ $penalty_rate = 5; // 5% overdue penalty
         $is_overdue = false;
         $days_since_release = 0;
         $start_date = $loan['date_released'] ?: $loan['date_created'];
+        $loan['due_date'] = null;
         if($start_date) {
             $release_date = new DateTime($start_date);
             $now = new DateTime();
             $days_since_release = $release_date->diff($now)->days;
-            $loan_duration_days = ($loan['duration_months'] ?: 1) * 30;
+            // Final due date from the loan's own term (weeks or months)
+            $loan['due_date'] = loanDueDate($start_date, (int) ($loan['duration_months'] ?: 1), $loan['term_unit'] ?? 'month');
 
-            // Loan is overdue if duration has passed and not fully paid
-            if($days_since_release > $loan_duration_days && $outstanding > 0) {
+            // Loan is overdue if the due date has passed and it is not fully paid
+            if(date('Y-m-d') > $loan['due_date'] && $outstanding > 0) {
                 $is_overdue = true;
                 $overdue_count++;
             }
@@ -339,8 +343,7 @@ $penalty_rate = 5; // 5% overdue penalty
                     <?php else: ?>
                     <?php foreach($loans_data as $loan):
                         $penalty_amount = $loan['is_overdue'] ? ($loan['outstanding'] * $penalty_rate / 100) : 0;
-                        $start_date = $loan['date_released'] ?: $loan['date_created'];
-                        $due_date = $start_date ? date('M d, Y', strtotime($start_date . ' + ' . ($loan['duration_months'] ?: 1) . ' months')) : 'N/A';
+                        $due_date = $loan['due_date'] ? date('M d, Y', strtotime($loan['due_date'])) : 'N/A';
                     ?>
                     <tr>
                         <td>
@@ -355,7 +358,7 @@ $penalty_rate = 5; // 5% overdue penalty
                         <td class="amount-cell amount-paid"><?php echo formatCurrency($loan['total_paid']); ?></td>
                         <td class="amount-cell amount-due"><?php echo formatCurrency($loan['outstanding']); ?></td>
                         <td>
-                            <?php echo $loan['duration_months'] ?: 1; ?> month(s)
+                            <?php echo formatLoanTerm($loan['duration_months'] ?: 1, $loan['term_unit'] ?? 'month'); ?>
                             <div class="due-date-info <?php echo $loan['is_overdue'] ? 'overdue' : ''; ?>">
                                 Due: <?php echo $due_date; ?>
                                 <?php if($loan['is_overdue']): ?>

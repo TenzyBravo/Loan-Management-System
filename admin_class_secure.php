@@ -415,45 +415,49 @@ class SecureAction {
         $purpose = Security::sanitizeString($_POST['purpose'] ?? '');
         $status = isset($_POST['status']) ? Security::sanitizeInt($_POST['status']) : null;
         
-        // Gather additional loan parameters (interest, calculation type, loan_amount, duration)
-        $interest_rate = Security::sanitizeFloat($_POST['interest_rate'] ?? 0);
-        $calculation_type = in_array($_POST['calculation_type'] ?? 'simple', ['simple','compound']) ? $_POST['calculation_type'] : 'simple';
-        $loan_amount = Security::sanitizeFloat($_POST['loan_amount'] ?? $amount);
-        // If a plan is selected and duration not provided, fall back to plan months
-        $duration_months = Security::sanitizeInt($_POST['duration_months'] ?? 0);
-        if ($duration_months <= 0 && !empty($plan_id)) {
+        // Loan term: weeks (fixed rate by length) or months
+        $term_unit = normalizeTermUnit($_POST['term_unit'] ?? 'month');
+        $interest_rate = (float) Security::sanitizeFloat($_POST['interest_rate'] ?? 0);
+        $duration_months = (int) Security::sanitizeInt($_POST['duration_months'] ?? 0); // count of term units
+
+        // Collateral (all loans are collateral based)
+        $collateral_description = trim($_POST['collateral_description'] ?? '');
+        $collateral_value_raw = trim($_POST['collateral_value'] ?? '');
+        $collateral_value = $collateral_value_raw === '' ? null : (float) $collateral_value_raw;
+
+        if ((float) $amount <= 0) {
+            return json_encode(['status' => 'error', 'message' => 'Enter a loan amount greater than zero.']);
+        }
+        if (empty($id) && $collateral_description === '') {
+            return json_encode(['status' => 'error', 'message' => 'All loans are collateral based. Please describe the collateral.']);
+        }
+        if ($collateral_value !== null && $collateral_value < 0) {
+            return json_encode(['status' => 'error', 'message' => 'Collateral value cannot be negative.']);
+        }
+
+        // Monthly loans: if a plan is selected and duration not provided, fall back to plan months
+        if ($term_unit === 'month' && $duration_months <= 0 && !empty($plan_id)) {
             $pstmt = $this->conn->prepare("SELECT months, interest_percentage FROM loan_plan WHERE id = ?");
             $pstmt->bind_param("i", $plan_id);
             $pstmt->execute();
             $plan_row = $pstmt->get_result()->fetch_assoc();
             $pstmt->close();
             if ($plan_row) {
-                if ($duration_months <= 0) $duration_months = intval($plan_row['months']);
+                $duration_months = intval($plan_row['months']);
                 if (empty($interest_rate)) $interest_rate = floatval($plan_row['interest_percentage']);
             }
         }
         if ($duration_months <= 0) $duration_months = 1;
 
-        // Compute loan totals
+        // Compute loan totals. Weekly loans ignore the posted rate (fixed by length).
         try {
-            $calc = calculateLoan($loan_amount, $interest_rate ?: 18.0, $duration_months, $calculation_type);
-        } catch(Exception $e) {
-            // Fallback to simple calculation to avoid blocking save
-            // Correctly convert annual interest rate to monthly
-            $monthly_rate = $interest_rate / 12 / 100;
-            $total_interest = $loan_amount * $monthly_rate * $duration_months;
-            $total_payable = $loan_amount + $total_interest;
-
-            $calc = [
-                'total_interest' => round($total_interest, 2),
-                'total_payable' => round($total_payable, 2),
-                'monthly_installment' => round($total_payable / $duration_months, 2)
-            ];
-            $calc['interest_rate'] = $interest_rate;
-            $calc['calculation_type'] = $calculation_type;
-            $calc['months'] = $duration_months;
+            $calc = calculateLoanForTerm((float) $amount, $interest_rate, $duration_months, $term_unit);
+        } catch (Exception $e) {
+            return json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
 
+        // Multi-month loan saved without a rate: keep it "not set" (0) until staff assign one
+        $interest_rate = $calc['rate_not_set'] ? 0.0 : (float) $calc['interest_rate'];
         $total_interest = $calc['total_interest'];
         $total_payable = $calc['total_payable'];
         $monthly_installment = $calc['monthly_installment'];
@@ -473,62 +477,65 @@ class SecureAction {
             }
             $stmt->close();
 
-            $stmt = $this->conn->prepare("INSERT INTO loan_list (ref_no, borrower_id, loan_type_id, plan_id, amount, loan_amount, interest_rate, calculation_type, duration_months, total_interest, total_payable, monthly_installment, outstanding_balance, purpose) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("siiidddsidddds", $ref_no, $borrower_id, $loan_type_id, $plan_id, $amount, $loan_amount, $interest_rate, $calculation_type, $duration_months, $total_interest, $total_payable, $monthly_installment, $outstanding_balance, $purpose);
+            $stmt = $this->conn->prepare("INSERT INTO loan_list (ref_no, borrower_id, loan_type_id, plan_id, amount, interest_rate, duration_months, term_unit, total_interest, total_payable, monthly_installment, outstanding_balance, purpose, collateral_description, collateral_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            if ($stmt === false) {
+                return json_encode(['status' => 'error', 'message' => 'Failed to save loan. Has database/migrate_weekly_loans.sql been run?']);
+            }
+            $stmt->bind_param("siiiddisddddssd", $ref_no, $borrower_id, $loan_type_id, $plan_id, $amount, $interest_rate, $duration_months, $term_unit, $total_interest, $total_payable, $monthly_installment, $outstanding_balance, $purpose, $collateral_description, $collateral_value);
 
         } else {
+            // Keep existing collateral when the edit form leaves it blank
+            $setStatus = $status !== null ? ', status = ?' : '';
+            $stmt = $this->conn->prepare("UPDATE loan_list SET borrower_id = ?, loan_type_id = ?, plan_id = ?, amount = ?, interest_rate = ?, duration_months = ?, term_unit = ?, total_interest = ?, total_payable = ?, monthly_installment = ?, outstanding_balance = ?, purpose = ?, collateral_description = COALESCE(NULLIF(?, ''), collateral_description), collateral_value = COALESCE(?, collateral_value)" . $setStatus . " WHERE id = ?");
+            if ($stmt === false) {
+                return json_encode(['status' => 'error', 'message' => 'Failed to save loan. Has database/migrate_weekly_loans.sql been run?']);
+            }
             if ($status !== null) {
-                $stmt = $this->conn->prepare("UPDATE loan_list SET borrower_id = ?, loan_type_id = ?, plan_id = ?, amount = ?, loan_amount = ?, interest_rate = ?, calculation_type = ?, duration_months = ?, total_interest = ?, total_payable = ?, monthly_installment = ?, outstanding_balance = ?, purpose = ?, status = ? WHERE id = ?");
-                $stmt->bind_param("iiidddsiddddsii", $borrower_id, $loan_type_id, $plan_id, $amount, $loan_amount, $interest_rate, $calculation_type, $duration_months, $total_interest, $total_payable, $monthly_installment, $outstanding_balance, $purpose, $status, $id);
-                // Note: binding using a long type string in mysqli; the types line is split for readability
-
-                // Generate loan schedules if releasing
-                if ($status == 2) {
-                    // ensure outstanding balance set to total payable
-                    $outstanding_balance = $total_payable;
-                    $stmt->execute();
-                    $this->generateLoanSchedule($id, $plan_id);
-                    return 1; // executed successfully above
-                }
+                $stmt->bind_param("iiiddisddddssdii", $borrower_id, $loan_type_id, $plan_id, $amount, $interest_rate, $duration_months, $term_unit, $total_interest, $total_payable, $monthly_installment, $outstanding_balance, $purpose, $collateral_description, $collateral_value, $status, $id);
             } else {
-                $stmt = $this->conn->prepare("UPDATE loan_list SET borrower_id = ?, loan_type_id = ?, plan_id = ?, amount = ?, loan_amount = ?, interest_rate = ?, calculation_type = ?, duration_months = ?, total_interest = ?, total_payable = ?, monthly_installment = ?, outstanding_balance = ?, purpose = ? WHERE id = ?");
-                $stmt->bind_param("iiidddsiddddsi", $borrower_id, $loan_type_id, $plan_id, $amount, $loan_amount, $interest_rate, $calculation_type, $duration_months, $total_interest, $total_payable, $monthly_installment, $outstanding_balance, $purpose, $id);
+                $stmt->bind_param("iiiddisddddssdi", $borrower_id, $loan_type_id, $plan_id, $amount, $interest_rate, $duration_months, $term_unit, $total_interest, $total_payable, $monthly_installment, $outstanding_balance, $purpose, $collateral_description, $collateral_value, $id);
             }
         }
-        
+
         $result = $stmt->execute();
         $stmt->close();
-        return $result ? 1 : 0;
+
+        // Generate the repayment schedule when the loan is released
+        if ($result && !empty($id) && $status !== null && $status == 2) {
+            $this->generateLoanSchedule($id);
+        }
+
+        return $result ? 1 : json_encode(['status' => 'error', 'message' => 'Failed to save loan.']);
     }
 
     /**
-     * Generate loan payment schedule
+     * Generate loan payment schedule from the loan's own term
+     * (one due date for weekly loans, one per month for monthly loans)
      */
-    private function generateLoanSchedule($loanId, $planId) {
-        // Get plan months
-        $stmt = $this->conn->prepare("SELECT months FROM loan_plan WHERE id = ?");
-        $stmt->bind_param("i", $planId);
+    private function generateLoanSchedule($loanId) {
+        $stmt = $this->conn->prepare("SELECT duration_months, term_unit FROM loan_list WHERE id = ?");
+        $stmt->bind_param("i", $loanId);
         $stmt->execute();
-        $plan = $stmt->get_result()->fetch_assoc();
+        $loan = $stmt->get_result()->fetch_assoc();
         $stmt->close();
-        
-        if (!$plan) return;
-        
+
+        if (!$loan) return;
+
         // Delete existing schedules
         $stmt = $this->conn->prepare("DELETE FROM loan_schedules WHERE loan_id = ?");
         $stmt->bind_param("i", $loanId);
         $stmt->execute();
         $stmt->close();
-        
+
         // Create new schedules
+        $dates = loanScheduleDates(date('Y-m-d'), (int) $loan['duration_months'], $loan['term_unit'] ?? 'month');
         $stmt = $this->conn->prepare("INSERT INTO loan_schedules (loan_id, date_due) VALUES (?, ?)");
-        
-        for ($i = 1; $i <= $plan['months']; $i++) {
-            $dueDate = date('Y-m-d', strtotime("+$i months"));
+
+        foreach ($dates as $dueDate) {
             $stmt->bind_param("is", $loanId, $dueDate);
             $stmt->execute();
         }
-        
+
         $stmt->close();
         
         // Update release date
@@ -1340,10 +1347,10 @@ class SecureAction {
      */
     public function approve_loan_application() {
         $loan_id = Security::sanitizeInt($_POST['loan_id'] ?? 0);
-        $interest_rate = Security::sanitizeFloat($_POST['interest_rate'] ?? 0);
+        $interest_rate = (float) Security::sanitizeFloat($_POST['interest_rate'] ?? 0);
 
-        if($loan_id == 0 || $interest_rate == 0) {
-            return json_encode(['status' => 'error', 'message' => 'Invalid loan ID or interest rate']);
+        if($loan_id == 0) {
+            return json_encode(['status' => 'error', 'message' => 'Invalid loan ID']);
         }
 
         // Get loan details
@@ -1357,11 +1364,18 @@ class SecureAction {
             return json_encode(['status' => 'error', 'message' => 'Loan not found']);
         }
 
-        // Recalculate loan with assigned interest rate
-        try {
-            $duration_months = $loan['duration_months'] ?? 1;
+        $term_unit = normalizeTermUnit($loan['term_unit'] ?? 'month');
+        $duration_months = (int) ($loan['duration_months'] ?? 1);
 
-            $calc = calculateLoan($loan['amount'], $interest_rate, $duration_months, 'simple');
+        // Weekly and 1-month loans have fixed rates; every other loan needs a rate from staff
+        if ($term_unit === 'month' && $duration_months > 1 && $interest_rate == 0) {
+            return json_encode(['status' => 'error', 'message' => 'Please assign an interest rate']);
+        }
+
+        // Recalculate loan with assigned interest rate (weekly: fixed by length, posted rate ignored)
+        try {
+            $calc = calculateLoanForTerm((float) $loan['amount'], $interest_rate, $duration_months, $term_unit);
+            $interest_rate = (float) $calc['interest_rate'];
 
             $total_interest = $calc['total_interest'];
             $total_payable = $calc['total_payable'];
@@ -1404,6 +1418,9 @@ class SecureAction {
                 return json_encode(['status' => 'error', 'message' => 'Database update failed: ' . $error]);
             }
             $stmt->close();
+
+            // Create the repayment schedule (due dates) now that the loan is released
+            $this->generateLoanSchedule($loan_id);
 
             // Notify customer (in-app notification + email)
             try {

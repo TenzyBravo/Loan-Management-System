@@ -2,24 +2,24 @@
 <?php
 require_once __DIR__ . '/includes/finance.php';
 
-// Extract POST data safely
-extract($_POST);
-
-// Validate and set defaults for required variables
-$amount = isset($amount) && is_numeric($amount) ? floatval($amount) : 0;
-$interest_rate = isset($interest_rate) && is_numeric($interest_rate) ? floatval($interest_rate) : 18.0;
-$duration_months = isset($duration_months) && is_numeric($duration_months) && $duration_months > 0 ? intval($duration_months) : 1;
-$calculation_type = isset($calculation_type) && in_array($calculation_type, ['simple', 'compound']) ? $calculation_type : 'compound';
+// Read and validate POST data
+$amount = isset($_POST['amount']) && is_numeric($_POST['amount']) ? floatval($_POST['amount']) : 0;
+$interest_rate = isset($_POST['interest_rate']) && is_numeric($_POST['interest_rate']) ? floatval($_POST['interest_rate']) : 0;
+$duration_months = isset($_POST['duration_months']) && is_numeric($_POST['duration_months']) && $_POST['duration_months'] > 0 ? intval($_POST['duration_months']) : 1;
+$term_unit = normalizeTermUnit($_POST['term_unit'] ?? 'month');
+$is_weekly = ($term_unit === 'week');
 
 // Track if we have valid data and calculation succeeded
 $calculationSuccess = false;
 $calculationError = null;
 $rateNotSet = false;
+$isOneMonth = false;
 
 // Only calculate if we have valid data
 if($amount > 0 && $duration_months > 0) {
     try {
-        $loanDetails = calculateLoan($amount, $interest_rate, $duration_months, $calculation_type);
+        $loanDetails = calculateLoanForTerm($amount, $interest_rate, $duration_months, $term_unit);
+        $interest_rate = $loanDetails['interest_rate'];
         $totalPayable = $loanDetails['total_payable'];
         $monthlyInstallment = $loanDetails['monthly_installment'];
         $totalInterest = $loanDetails['total_interest'];
@@ -42,6 +42,15 @@ if($amount > 0 && $duration_months > 0) {
 }
 
 ?>
+
+<!-- Info: Weekly Loan Fixed Rate -->
+<?php if($is_weekly && $calculationSuccess): ?>
+<div class="alert alert-success" style="background: #d1fae5; border-left: 4px solid #10b981; padding: 12px 15px; border-radius: 4px; margin-bottom: 15px;">
+    <i class="fa fa-check-circle"></i>
+    <strong>Weekly Loan:</strong> <?php echo formatLoanTerm($duration_months, 'week') ?> loans have a fixed <strong><?php echo $interest_rate ?>% TOTAL interest</strong>.
+    <br><small>Repaid in one payment <?php echo formatLoanTerm($duration_months, 'week') ?> after release.</small>
+</div>
+<?php endif; ?>
 
 <!-- Info: 1-Month Loan Auto-Rate -->
 <?php if($isOneMonth): ?>
@@ -121,15 +130,17 @@ if($amount > 0 && $duration_months > 0) {
         <div class="col-md-6 col-12 mb-3">
             <div class="result-card">
                 <div class="result-label">Duration</div>
-                <div class="result-value"><?php echo $duration_months ?> months</div>
+                <div class="result-value"><?php echo formatLoanTerm($duration_months, $term_unit) ?></div>
             </div>
         </div>
 
         <div class="col-md-6 col-12 mb-3">
             <div class="result-card result-card-highlight">
-                <div class="result-label">Monthly Installment</div>
+                <div class="result-label"><?php echo installmentLabel($term_unit) ?></div>
                 <div class="result-value"><?php echo $currency . ' ' . number_format($monthlyInstallment, 2) ?></div>
-                <small class="text-muted">Due every month for <?php echo $duration_months ?> months</small>
+                <small class="text-muted"><?php echo $is_weekly
+                    ? 'One payment due ' . formatLoanTerm($duration_months, 'week') . ' after release'
+                    : 'Due every month for ' . formatLoanTerm($duration_months, 'month') ?></small>
             </div>
         </div>
     </div>

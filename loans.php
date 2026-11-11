@@ -1,6 +1,7 @@
 <?php require_once __DIR__ . '/includes/auth_guard.php'; require_staff(); ?>
 <?php
 include 'db_connect.php';
+require_once __DIR__ . '/includes/finance.php';
 ?>
 
 <div class="container-fluid">
@@ -53,25 +54,23 @@ include 'db_connect.php';
 							$qry = $conn->query("SELECT l.*,concat(b.lastname,', ',b.firstname,' ',b.middlename)as name, b.contact_no, b.address from loan_list l inner join borrowers b on b.id = l.borrower_id  order by id asc");
 							while($row = $qry->fetch_assoc()):
 								
-								// Check if plan exists and has valid data
-								$has_valid_plan = isset($plan_arr[$row['plan_id']]) && 
-								                  isset($plan_arr[$row['plan_id']]['months']) && 
-								                  $plan_arr[$row['plan_id']]['months'] > 0;
-								
-								if($has_valid_plan) {
-									// Prefer precomputed monthly_installment if available
-									if(isset($row['monthly_installment']) && $row['monthly_installment'] > 0) {
-										$monthly = $row['monthly_installment'];
-										$penalty = $monthly * ($plan_arr[$row['plan_id']]['penalty_rate']/100);
-									} else {
-										$monthly = ($row['amount'] + ($row['amount'] * ($plan_arr[$row['plan_id']]['interest_percentage']/100))) / $plan_arr[$row['plan_id']]['months'];
-										$penalty = $monthly * ($plan_arr[$row['plan_id']]['penalty_rate']/100);
-									}
+								// Use the loan's own stored term and totals (weekly loans have no matching plan)
+								$row_unit = normalizeTermUnit($row['term_unit'] ?? 'month');
+								$row_count = max(1, (int) ($row['duration_months'] ?? 1));
+								$row_total = (float) ($row['total_payable'] ?? 0);
+								$has_valid_plan = $row_total > 0 || (isset($plan_arr[$row['plan_id']]) && $plan_arr[$row['plan_id']]['months'] > 0);
+								$penalty_rate_row = isset($plan_arr[$row['plan_id']]) ? $plan_arr[$row['plan_id']]['penalty_rate'] : 5;
+
+								if($row_total > 0) {
+									$monthly = (isset($row['monthly_installment']) && $row['monthly_installment'] > 0) ? $row['monthly_installment'] : $row_total / ($row_unit === 'week' ? 1 : $row_count);
+								} elseif($has_valid_plan) {
+									// Older loans without stored totals: derive from the plan
+									$monthly = ($row['amount'] + ($row['amount'] * ($plan_arr[$row['plan_id']]['interest_percentage']/100))) / $plan_arr[$row['plan_id']]['months'];
+									$row_total = $monthly * $plan_arr[$row['plan_id']]['months'];
 								} else {
-									// Default values if no valid plan
 									$monthly = 0;
-									$penalty = 0;
 								}
+								$penalty = $monthly * ($penalty_rate_row/100);
 								
 								$payments = $conn->query("SELECT * from payments where loan_id =".$row['id']);
 								$paid = $payments->num_rows;
@@ -102,11 +101,11 @@ include 'db_connect.php';
 						 	<td>
 						 		<p>Reference :<b><?php echo $row['ref_no'] ?></b></p>
 						 		<p><small>Loan type :<b><?php echo isset($type_arr[$row['loan_type_id']]) ? $type_arr[$row['loan_type_id']] : 'N/A' ?></small></b></p>
-						 		<p><small>Plan :<b><?php echo $has_valid_plan ? $plan_arr[$row['plan_id']]['plan'] : 'No Plan Assigned' ?></small></b></p>
+						 		<p><small>Term :<b><?php echo formatLoanTerm($row_count, $row_unit) ?><?php echo (float) $row['interest_rate'] > 0 ? ' [ ' . (float) $row['interest_rate'] . '% total ]' : '' ?></small></b></p>
 						 		<p><small>Amount :<b><?php echo number_format($row['amount'], 2) ?></small></b></p>
 						 		<?php if($has_valid_plan): ?>
-						 		<p><small>Total Payable Amount :<b><?php echo number_format($monthly * $plan_arr[$row['plan_id']]['months'],2) ?></small></b></p>
-						 		<p><small>Monthly Payable Amount: <b><?php echo number_format($monthly,2) ?></small></b></p>
+						 		<p><small>Total Payable Amount :<b><?php echo number_format($row_total,2) ?></small></b></p>
+						 		<p><small><?php echo $row_unit === 'week' ? 'Repayment Due' : 'Monthly Payable Amount' ?>: <b><?php echo number_format($monthly,2) ?></small></b></p>
 						 		<p><small>Overdue Payable Amount: <b><?php echo number_format($penalty,2) ?></small></b></p>
 						 		<?php else: ?>
 						 		<p><small class="text-danger">Please assign a loan plan to this loan</small></p>
@@ -120,7 +119,7 @@ include 'db_connect.php';
 						 		<p>Date: <b>
 						 		<?php echo date('M d, Y',strtotime($next)); ?>
 						 		</b></p>
-						 		<p><small>Monthly amount:<b><?php echo number_format($monthly,2) ?></b></small></p>
+						 		<p><small><?php echo $row_unit === 'week' ? 'Amount due' : 'Monthly amount' ?>:<b><?php echo number_format($monthly,2) ?></b></small></p>
 						 		<p><small>Penalty :<b><?php echo $add = (date('Ymd',strtotime($next)) < date("Ymd") ) ?  $penalty : 0; ?></b></small></p>
 						 		<p><small>Payable Amount :<b><?php echo number_format($monthly + $add,2) ?></b></small></p>
 						 		<?php else: ?>

@@ -34,9 +34,11 @@ $pendingLoans = $conn->query("SELECT COUNT(*) as count FROM loan_list WHERE stat
 $completedLoans = $conn->query("SELECT COUNT(*) as count FROM loan_list WHERE status = 3")->fetch_assoc()['count'];
 
 // Total receivable (principal + interest - payments)
-$totalLoansValue = $conn->query("SELECT COALESCE(SUM(l.amount + (l.amount * (p.interest_percentage/100))), 0) as total 
-                                  FROM loan_list l 
-                                  INNER JOIN loan_plan p ON p.id = l.plan_id 
+// Uses each loan's stored total (covers weekly loans); falls back to the plan for older loans
+$totalLoansValue = $conn->query("SELECT COALESCE(SUM(CASE WHEN l.total_payable > 0 THEN l.total_payable
+                                          ELSE l.amount + (l.amount * (COALESCE(p.interest_percentage, 0)/100)) END), 0) as total
+                                  FROM loan_list l
+                                  LEFT JOIN loan_plan p ON p.id = l.plan_id
                                   WHERE l.status = 2")->fetch_assoc()['total'];
 
 $totalPayments = $conn->query("SELECT COALESCE(SUM(amount), 0) as total FROM payments")->fetch_assoc()['total'];
@@ -204,11 +206,12 @@ if ($tableCheck && $tableCheck->num_rows > 0) {
     $stmt = $conn->prepare("SELECT ls.*, l.ref_no, l.amount as loan_amount,
                                        CONCAT(b.firstname, ' ', b.lastname) as borrower_name,
                                        lp.months, lp.interest_percentage,
-                                       (l.amount + (l.amount * lp.interest_percentage / 100)) / lp.months as monthly_payment
+                                       COALESCE(NULLIF(l.monthly_installment, 0),
+                                                (l.amount + (l.amount * lp.interest_percentage / 100)) / NULLIF(lp.months, 0)) as monthly_payment
                                        FROM loan_schedules ls
                                        INNER JOIN loan_list l ON ls.loan_id = l.id
                                        INNER JOIN borrowers b ON l.borrower_id = b.id
-                                       INNER JOIN loan_plan lp ON l.plan_id = lp.id
+                                       LEFT JOIN loan_plan lp ON l.plan_id = lp.id
                                        WHERE l.status = 2
                                        AND ls.date_due BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
                                        ORDER BY ls.date_due ASC

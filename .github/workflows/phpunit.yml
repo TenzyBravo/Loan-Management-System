@@ -1,24 +1,39 @@
 name: PHPUnit Tests
 
+# Runs on every branch push and on pull requests into main.
+# A change should only be merged into main (which deploys to the live site) when this passes.
 on:
   push:
-    branches: [main, 'fix/*', 'cleanup/*']
+    branches: ['**']
   pull_request:
     branches: [main]
 
 jobs:
-  phpunit:
+  checks:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['7.4', '8.1', '8.3']
+    name: PHP ${{ matrix.php-version }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
-          extensions: mbstring, xml
-      - name: Install Composer
-        run: sudo apt-get update && sudo apt-get install -y composer
+          php-version: ${{ matrix.php-version }}
+          extensions: mbstring, xml, mysqli
+          tools: composer
+
+      - name: Syntax check every PHP file
+        run: |
+          find . -name '*.php' -not -path './vendor/*' -not -path './assets/*' -print0 \
+            | xargs -0 -n1 php -l > /tmp/lint.log 2>&1 || { grep -v '^No syntax errors' /tmp/lint.log; exit 1; }
+          echo "Checked $(grep -c '^No syntax errors' /tmp/lint.log) files - no syntax errors"
+
       - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist
+        run: composer install --no-interaction --prefer-dist --no-progress
+
       - name: Run tests
         run: composer test

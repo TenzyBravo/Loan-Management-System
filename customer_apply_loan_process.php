@@ -2,184 +2,175 @@
 session_start();
 include('db_connect.php');
 include('includes/notifications.php');
+require_once __DIR__ . '/includes/finance.php';
 
 if(!isset($_SESSION['customer_id'])){
     header('location: customer_login.php');
     exit;
 }
 
-if($_SERVER['REQUEST_METHOD'] == 'POST') {
-    
-    $customer_id = $_SESSION['customer_id'];
-    $loan_type_id = $_POST['loan_type_id'];
-    $amount = $_POST['amount'];
-    $purpose = $_POST['purpose'];
-    $duration_months = $_POST['duration_months'] ?? 12; // Default to 12 months if not provided
-
-    // Use a dummy plan_id since we're not using predefined plans anymore
-    $plan_id = $_POST['plan_id'] ?? 1; // Default to first plan if not provided
-    
-    // Generate unique reference number
-    $ref_no = mt_rand(10000000, 99999999);
-    
-    // Check if ref_no already exists
-    do {
-        $stmt = $conn->prepare("SELECT id FROM loan_list WHERE ref_no = ?");
-        $stmt->bind_param("s", $ref_no);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $exists = $result->num_rows > 0;
-        $stmt->close();
-
-        if ($exists) {
-            $ref_no = mt_rand(10000000, 99999999);
-        }
-    } while ($exists);
-    
-    // Start transaction
-    $conn->begin_transaction();
-    
-    try {
-        // Business Logic: Auto-assign 18% for loans <= K5,000
-        // For loans > K5,000, admin will assign custom rate
-        if($amount <= 5000) {
-            $interest_rate = 18.0; // Auto-assign 18% for small loans
-            $calculation_type = 'simple'; // Use simple interest
-        } else {
-            $interest_rate = 0; // Will be set by admin during review
-            $calculation_type = 'simple'; // Default, admin can change
-        }
-
-        // Calculate loan values (for small loans with assigned rate, or estimate for large loans)
-        if($interest_rate > 0) {
-            // Calculate actual values
-            $monthlyRate = $interest_rate / 100 / 12;
-            $totalInterest = $amount * $monthlyRate * $duration_months;
-            $totalPayable = $amount + $totalInterest;
-            $monthlyInstallment = $totalPayable / $duration_months;
-        } else {
-            // Estimate for large loans (will be recalculated by admin)
-            $estimated_interest_rate = 28.0; // Conservative estimate
-            $monthlyRate = $estimated_interest_rate / 100 / 12;
-            $totalInterest = $amount * $monthlyRate * $duration_months;
-            $totalPayable = $amount + $totalInterest;
-            $monthlyInstallment = $totalPayable / $duration_months;
-        }
-
-        // Insert loan application with original fields (compatible with original database)
-        $stmt = $conn->prepare("INSERT INTO loan_list (ref_no, loan_type_id, borrower_id, purpose, amount, plan_id, status, application_source, application_status, date_created)
-                VALUES (?, ?, ?, ?, ?, ?, 0, 'customer', 1, NOW())");
-        $stmt->bind_param("siiisi", $ref_no, $loan_type_id, $customer_id, $purpose, $amount, $plan_id);
-
-        if(!$stmt->execute()) {
-            throw new Exception('Error submitting application: ' . $conn->error);
-        }
-        $stmt->close();
-
-        // Get the inserted loan ID for additional processing
-        $loan_id = $conn->insert_id;
-
-        // If enhanced fields exist in the database, update with all loan details
-        $check_columns = $conn->query("SHOW COLUMNS FROM loan_list LIKE 'duration_months'");
-        if($check_columns->num_rows > 0) {
-            // Update with complete loan information
-            // Note: 'amount' is already set in INSERT, 'calculation_type' column doesn't exist
-            $update_stmt = $conn->prepare("UPDATE loan_list SET
-                duration_months=?,
-                interest_rate=?,
-                total_interest=?,
-                total_payable=?,
-                monthly_installment=?,
-                outstanding_balance=?
-                WHERE id=?");
-
-            if($update_stmt === false) {
-                throw new Exception('Prepare failed: ' . $conn->error);
-            }
-
-            $outstanding_balance = $totalPayable; // Initial outstanding balance
-            $update_stmt->bind_param("idddddi",
-                $duration_months,
-                $interest_rate,
-                $totalInterest,
-                $totalPayable,
-                $monthlyInstallment,
-                $outstanding_balance,
-                $loan_id
-            );
-
-            if(!$update_stmt->execute()) {
-                throw new Exception('Update failed: ' . $update_stmt->error);
-            }
-            $update_stmt->close();
-        }
-        
-        // Create notification for customer
-        $stmt = $conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type)
-                      VALUES (?, 'Application Submitted', 'Your loan application (Ref: $ref_no) has been submitted successfully. Our team will review it shortly.', 'success')");
-        $stmt->bind_param("i", $customer_id);
-        $stmt->execute();
-        $stmt->close();
-        
-        // Skip activity logging if activity_log table doesn't exist
-        // Uncomment the following code if you have the activity_log table
-        /*
-        $ip = $_SERVER['REMOTE_ADDR'];
-        $stmt = $conn->prepare("INSERT INTO activity_log (user_id, user_type, action, description, target_id, target_type, ip_address)
-                    VALUES (?, 'customer', 'loan_application', 'Submitted loan application Ref: $ref_no for K $amount', ?, 'loan', ?)");
-        $stmt->bind_param("iis", $customer_id, $loan_id, $ip);
-        $stmt->execute();
-        $stmt->close();
-        */
-        
-        // Create application checklist for admin review
-        $checklist_items = array(
-            'Identity Verification - ID Document Checked',
-            'Employment Verification - Proof of Employment Verified',
-            'Income Verification - Pay Slip Reviewed',
-            'Credit History Check',
-            'Loan Amount Feasibility Assessment',
-            'Purpose of Loan Evaluation',
-            'Repayment Capacity Analysis'
-        );
-        
-        // Prepare statement for checklist items
-        $stmt = $conn->prepare("INSERT INTO loan_application_checklist (loan_id, item) VALUES (?, ?)");
-        foreach($checklist_items as $item) {
-            $stmt->bind_param("is", $loan_id, $item);
-            $stmt->execute();
-        }
-        $stmt->close();
-
-        // Commit transaction
-        $conn->commit();
-
-        // Get customer name for notification
-        $stmt = $conn->prepare("SELECT firstname, lastname FROM borrowers WHERE id = ?");
-        $stmt->bind_param("i", $customer_id);
-        $stmt->execute();
-        $customer = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-        $customer_name = $customer['firstname'] . ' ' . $customer['lastname'];
-
-        // Notify admin of new loan application (email + in-app notification)
-        notify_admin_new_loan($conn, $loan_id, $customer_name, $amount);
-        
-        $_SESSION['success_msg'] = 'Your loan application has been submitted successfully! Reference Number: ' . $ref_no;
-        header('Location: customer_my_loans.php');
-        exit;
-        
-    } catch(Exception $e) {
-        // Rollback on error
-        $conn->rollback();
-        
-        $_SESSION['error_msg'] = 'Application submission failed: ' . $e->getMessage();
-        header('Location: customer_apply_loan.php');
-        exit;
-    }
-    
-} else {
+if($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: customer_apply_loan.php');
     exit;
 }
-?>
+
+/**
+ * Send the customer back to the form with an error message.
+ */
+function apply_fail(string $message): void {
+    $_SESSION['error_msg'] = $message;
+    header('Location: customer_apply_loan.php');
+    exit;
+}
+
+$customer_id  = (int) $_SESSION['customer_id'];
+$loan_type_id = (int) ($_POST['loan_type_id'] ?? 0);
+$amount       = (float) ($_POST['amount'] ?? 0);
+$purpose      = trim($_POST['purpose'] ?? '');
+$collateral_description = trim($_POST['collateral_description'] ?? '');
+$collateral_value_raw   = trim($_POST['collateral_value'] ?? '');
+$collateral_value       = $collateral_value_raw === '' ? null : (float) $collateral_value_raw;
+
+// Predefined plans are no longer chosen by customers; keep the legacy default
+$plan_id = (int) ($_POST['plan_id'] ?? 1);
+
+// ---------------------------------------------------------------
+// Validate input
+// ---------------------------------------------------------------
+if ($loan_type_id <= 0) {
+    apply_fail('Please select a loan type.');
+}
+if ($amount < 1000 || $amount > 1000000) {
+    apply_fail('Loan amount must be between K 1,000 and K 1,000,000.');
+}
+if ($purpose === '') {
+    apply_fail('Please describe the purpose of the loan.');
+}
+if ($collateral_description === '') {
+    apply_fail('All loans are collateral based. Please describe the collateral you are offering.');
+}
+if ($collateral_value !== null && $collateral_value < 0) {
+    apply_fail('Collateral value cannot be negative.');
+}
+
+// Repayment term: "week:1".."week:4", "month:1", or "month:multi" + duration_months
+$term_choice = $_POST['term_choice'] ?? '';
+if (preg_match('/^week:(\d+)$/', $term_choice, $m)) {
+    $term_unit = 'week';
+    $duration  = (int) $m[1];
+} elseif ($term_choice === 'month:1') {
+    $term_unit = 'month';
+    $duration  = 1;
+} elseif ($term_choice === 'month:multi') {
+    $term_unit = 'month';
+    $duration  = (int) ($_POST['duration_months'] ?? 0);
+    if ($duration < 2 || $duration > 120) {
+        apply_fail('Please enter a loan duration between 2 and 120 months.');
+    }
+} else {
+    apply_fail('Please choose a repayment term.');
+}
+
+// ---------------------------------------------------------------
+// Calculate the loan
+// - Weekly loans: fixed rate by length (15/20/25/30%)
+// - 1-month loans: fixed 18%
+// - 2+ month loans: rate set by staff at review (stored as 0 until then;
+//   totals below are an 18% preview and are recalculated on approval)
+// ---------------------------------------------------------------
+try {
+    $calc = calculateLoanForTerm($amount, 0, $duration, $term_unit);
+} catch (Exception $e) {
+    apply_fail($e->getMessage());
+}
+
+$interest_rate       = $calc['rate_not_set'] ? 0.0 : (float) $calc['interest_rate'];
+$totalInterest       = $calc['total_interest'];
+$totalPayable        = $calc['total_payable'];
+$monthlyInstallment  = $calc['monthly_installment'];
+$outstanding_balance = $totalPayable;
+
+// Generate unique reference number
+do {
+    $ref_no = (string) mt_rand(10000000, 99999999);
+    $stmt = $conn->prepare("SELECT id FROM loan_list WHERE ref_no = ?");
+    $stmt->bind_param("s", $ref_no);
+    $stmt->execute();
+    $exists = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+} while ($exists);
+
+$conn->begin_transaction();
+
+try {
+    $stmt = $conn->prepare("INSERT INTO loan_list
+            (ref_no, loan_type_id, borrower_id, purpose, amount, plan_id, status, application_source, application_status, date_created,
+             duration_months, term_unit, interest_rate, total_interest, total_payable, monthly_installment, outstanding_balance,
+             collateral_description, collateral_value)
+            VALUES (?, ?, ?, ?, ?, ?, 0, 'customer', 1, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    if ($stmt === false) {
+        throw new Exception('Prepare failed: ' . $conn->error);
+    }
+    $stmt->bind_param("siisdiisdddddsd",
+        $ref_no, $loan_type_id, $customer_id, $purpose, $amount, $plan_id,
+        $duration, $term_unit, $interest_rate, $totalInterest, $totalPayable, $monthlyInstallment, $outstanding_balance,
+        $collateral_description, $collateral_value
+    );
+
+    if(!$stmt->execute()) {
+        throw new Exception('Error submitting application: ' . $stmt->error);
+    }
+    $stmt->close();
+
+    $loan_id = $conn->insert_id;
+
+    // Create notification for customer
+    $title   = 'Application Submitted';
+    $message = "Your loan application (Ref: $ref_no) for a " . formatLoanTerm($duration, $term_unit) . " loan has been submitted successfully. Our team will review it shortly.";
+    $type    = 'success';
+    $stmt = $conn->prepare("INSERT INTO customer_notifications (borrower_id, title, message, type) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("isss", $customer_id, $title, $message, $type);
+    $stmt->execute();
+    $stmt->close();
+
+    // Create application checklist for admin review
+    $checklist_items = array(
+        'Identity Verification - ID Document Checked',
+        'Employment Verification - Proof of Employment Verified',
+        'Income Verification - Pay Slip Reviewed',
+        'Collateral Verified and Valued',
+        'Credit History Check',
+        'Loan Amount Feasibility Assessment',
+        'Purpose of Loan Evaluation',
+        'Repayment Capacity Analysis'
+    );
+
+    $stmt = $conn->prepare("INSERT INTO loan_application_checklist (loan_id, item) VALUES (?, ?)");
+    foreach($checklist_items as $item) {
+        $stmt->bind_param("is", $loan_id, $item);
+        $stmt->execute();
+    }
+    $stmt->close();
+
+    $conn->commit();
+
+} catch(Exception $e) {
+    $conn->rollback();
+    error_log('Loan application failed: ' . $e->getMessage());
+    apply_fail('Application submission failed. Please try again or contact us.');
+}
+
+// Get customer name for notification
+$stmt = $conn->prepare("SELECT firstname, lastname FROM borrowers WHERE id = ?");
+$stmt->bind_param("i", $customer_id);
+$stmt->execute();
+$customer = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+$customer_name = $customer['firstname'] . ' ' . $customer['lastname'];
+
+// Notify admin of new loan application (email + in-app notification)
+notify_admin_new_loan($conn, $loan_id, $customer_name, $amount);
+
+$_SESSION['success_msg'] = 'Your loan application has been submitted successfully! Reference Number: ' . $ref_no;
+header('Location: customer_my_loans.php');
+exit;

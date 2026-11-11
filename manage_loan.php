@@ -1,9 +1,13 @@
 <?php require_once __DIR__ . '/includes/auth_guard.php'; require_staff(); ?>
 <?php
 include('db_connect.php');
+require_once __DIR__ . '/includes/finance.php';
 
 // Initialize loan data variables
 $loan_data = [];
+$term_unit = 'month';
+$collateral_description = '';
+$collateral_value = '';
 if(isset($_GET['id'])){
 	$id = $_GET['id'];
 	$stmt = $conn->prepare("SELECT * FROM loan_list where id = ?");
@@ -27,6 +31,9 @@ if(isset($_GET['id'])){
 		$duration_months = $loan_data['duration_months'] ?? '';
 		$monthly_installment = $loan_data['monthly_installment'] ?? '';
 		$months = $loan_data['months'] ?? '';
+		$term_unit = normalizeTermUnit($loan_data['term_unit'] ?? 'month');
+		$collateral_description = $loan_data['collateral_description'] ?? '';
+		$collateral_value = $loan_data['collateral_value'] ?? '';
 	}
 }
 ?>
@@ -200,6 +207,18 @@ if(isset($_GET['id'])){
 				<label class="control-label">Purpose of Loan</label>
 				<textarea name="purpose" cols="30" rows="3" class="form-control" placeholder="Enter the purpose of this loan..."><?php echo isset($purpose) ? $purpose : '' ?></textarea>
 			</div>
+
+			<div class="row">
+				<div class="col-md-8 form-group">
+					<label class="control-label">Collateral <span class="text-danger">*</span></label>
+					<textarea name="collateral_description" rows="2" class="form-control" placeholder="Describe the collateral, e.g. Toyota Corolla 2012, reg. ABC 1234" <?php echo empty($id) ? 'required' : '' ?>><?php echo htmlspecialchars($collateral_description) ?></textarea>
+					<small class="text-muted">All loans are collateral based</small>
+				</div>
+				<div class="col-md-4 form-group">
+					<label class="control-label">Collateral Value (K)</label>
+					<input type="number" name="collateral_value" class="form-control text-right" step="0.01" min="0" value="<?php echo htmlspecialchars((string) $collateral_value) ?>" placeholder="Optional">
+				</div>
+			</div>
 		</div>
 
 		<!-- Section 2: Loan Terms -->
@@ -210,7 +229,12 @@ if(isset($_GET['id'])){
 
 			<div class="info-alert">
 				<i class="fa fa-info-circle"></i>
-				<strong>Interest Rate Policy:</strong> Loans ≤ K5,000 are automatically assigned 18% interest rate. For loans > K5,000, select the appropriate rate based on risk assessment.
+				<strong>Interest Rate Policy:</strong>
+				Weekly loans have fixed rates (<?php
+					$parts = [];
+					foreach (AppConfig::WEEKLY_RATES as $w => $r) { $parts[] = formatLoanTerm($w, 'week') . ' ' . rtrim(rtrim(number_format($r, 2), '0'), '.') . '%'; }
+					echo implode(', ', $parts);
+				?>), repaid in one payment. 1-month loans are fixed at 18%. For longer loans, select the rate based on risk assessment.
 			</div>
 
 			<div class="row">
@@ -238,10 +262,18 @@ if(isset($_GET['id'])){
 			</div>
 
 			<div class="row">
-				<div class="col-md-6 form-group">
-					<label class="control-label">Duration (Months) <span class="text-danger">*</span></label>
-					<input type="number" name="duration_months" class="form-control text-right" step="1" id="duration_months" value="<?php echo isset($duration_months) ? $duration_months : (isset($months) ? $months : '') ?>" placeholder="Enter duration" required min="1">
-					<small class="text-muted">Loan repayment period in months</small>
+				<div class="col-md-3 form-group">
+					<label class="control-label">Term In <span class="text-danger">*</span></label>
+					<select name="term_unit" id="term_unit" class="custom-select browser-default">
+						<option value="month" <?php echo $term_unit === 'month' ? 'selected' : '' ?>>Months</option>
+						<option value="week" <?php echo $term_unit === 'week' ? 'selected' : '' ?>>Weeks</option>
+					</select>
+				</div>
+
+				<div class="col-md-3 form-group">
+					<label class="control-label" id="duration_label">Duration <span class="text-danger">*</span></label>
+					<input type="number" name="duration_months" class="form-control text-right" step="1" id="duration_months" value="<?php echo isset($duration_months) ? (int) $duration_months : (isset($months) ? (int) $months : '') ?>" placeholder="Enter duration" required min="1">
+					<small class="text-muted" id="duration_help">Number of months</small>
 				</div>
 
 				<div class="col-md-6 form-group d-flex align-items-end">
@@ -330,10 +362,34 @@ if(isset($_GET['id'])){
 		}
 	}
 
-	// BUSINESS RULE: Auto-set 18% for 1-month loans
+	// Weekly rates (fixed by length) - must match AppConfig::WEEKLY_RATES on the server
+	var WEEKLY_RATES = <?php echo json_encode(AppConfig::WEEKLY_RATES) ?>;
+
+	function isWeekly() {
+		return $('#term_unit').val() === 'week';
+	}
+
+	// BUSINESS RULES: weekly loans fixed by length; 1-month loans fixed at 18%
 	function checkDurationAndSetRate() {
 		var duration = parseInt($('#duration_months').val());
 		$('#auto-rate-notice').remove();
+
+		if(isWeekly()) {
+			$('#duration_help').text('Number of weeks (1-' + Object.keys(WEEKLY_RATES).length + ')');
+			$('#duration_months').attr('max', Object.keys(WEEKLY_RATES).length);
+			$('#plan_id').prop('disabled', true);
+			$('#interest_rate').prop('disabled', true);
+			if(WEEKLY_RATES[duration]) {
+				$('#interest_rate').after('<small class="text-success d-block mt-1" id="auto-rate-notice"><i class="fa fa-check-circle"></i> Fixed: ' + duration + '-week loans = ' + WEEKLY_RATES[duration] + '% total interest, one repayment</small>');
+			} else {
+				$('#interest_rate').after('<small class="text-danger d-block mt-1" id="auto-rate-notice"><i class="fa fa-exclamation-circle"></i> Weekly loans are 1 to ' + Object.keys(WEEKLY_RATES).length + ' weeks</small>');
+			}
+			return;
+		}
+
+		$('#duration_help').text('Number of months');
+		$('#duration_months').removeAttr('max');
+		$('#plan_id').prop('disabled', false);
 
 		if(duration === 1) {
 			// 1-month loan: automatically set to 18% TOTAL
@@ -347,8 +403,8 @@ if(isset($_GET['id'])){
 		}
 	}
 
-	// Monitor duration changes
-	$('#duration_months').on('change keyup', function(){
+	// Monitor duration / term changes
+	$('#duration_months, #term_unit').on('change keyup', function(){
 		checkDurationAndSetRate();
 	});
 
@@ -370,14 +426,16 @@ if(isset($_GET['id'])){
 			return false;
 		}
 
-		if(duration_months == '' || duration_months <= 0){
-			alert_toast("Enter duration in months first.","warning");
+		if(!duration_months || duration_months <= 0){
+			alert_toast("Enter the loan duration first.","warning");
 			end_load();
 			return false;
 		}
 
-		// BUSINESS RULE: 1-month loans auto-set to 18%
-		if(duration_months === 1) {
+		// BUSINESS RULE: weekly loans use their fixed rate (server enforces it); 1-month loans auto-set to 18%
+		if(isWeekly()) {
+			interest_rate = 0;
+		} else if(duration_months === 1) {
 			interest_rate = '18.0';
 			$('#interest_rate').val('18.0');
 		}
@@ -394,6 +452,7 @@ if(isset($_GET['id'])){
 				amount: amount,
 				interest_rate: interest_rate,
 				duration_months: duration_months,
+				term_unit: $('#term_unit').val(),
 				calculation_type: calculation_type
 			},
 			success:function(resp){
@@ -426,6 +485,11 @@ if(isset($_GET['id'])){
 					setTimeout(function(){
 						location.reload();
 					},1500)
+				} else {
+					var msg = 'Could not save the loan.';
+					try { msg = JSON.parse(resp).message || msg; } catch(e) {}
+					alert_toast(msg, "error");
+					end_load();
 				}
 			},
 			error: function(){
@@ -436,6 +500,7 @@ if(isset($_GET['id'])){
 	})
 
 	$(document).ready(function(){
+		checkDurationAndSetRate();
 		if('<?php echo isset($_GET['id']) ?>' == 1)
 			calculate()
 	})

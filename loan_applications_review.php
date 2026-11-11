@@ -2,6 +2,7 @@
 <?php
 include 'db_connect.php';
 require_once 'includes/helpers.php';
+require_once __DIR__ . '/includes/finance.php';
 ?>
 
 <style>
@@ -114,7 +115,7 @@ require_once 'includes/helpers.php';
 
                                     while($row = $pending->fetch_assoc()):
                                         $interest_display = $row['interest_rate'] > 0 ? $row['interest_rate'] . '%' : '<span class="text-warning">Not Set</span>';
-                                        $duration_display = $row['duration_months'] ?? 'N/A';
+                                        $duration_display = formatLoanTerm($row['duration_months'] ?? 1, $row['term_unit'] ?? 'month');
                                     ?>
                                     <tr>
                                         <td><strong><?php echo $row['ref_no'] ?></strong></td>
@@ -124,7 +125,7 @@ require_once 'includes/helpers.php';
                                         </td>
                                         <td><strong><?php echo formatCurrency($row['amount']) ?></strong></td>
                                         <td><?php echo $interest_display ?></td>
-                                        <td><?php echo $duration_display ?> months</td>
+                                        <td><?php echo $duration_display ?></td>
                                         <td><?php echo date('M d, Y', strtotime($row['date_created'])) ?></td>
                                         <td>
                                             <span class="badge badge-success"><?php echo $row['verified_docs'] ?></span> /
