@@ -1,0 +1,323 @@
+/* ==========================================================================
+   Basils Money Lenders - customer portal theme
+   Brand: green #1a5f2a + gold #d4af37 (matches the public website).
+   Mobile first: phone layout is the default, desktop is layered on at 992px.
+   Loaded after Bootstrap 4.6, so it restyles Bootstrap components too.
+   ========================================================================== */
+
+:root {
+    --brand: #1a5f2a;
+    --brand-600: #174f24;
+    --brand-700: #0d3d16;
+    --brand-50: #eef6ef;
+    --brand-100: #d7ebda;
+    --gold: #d4af37;
+    --gold-50: #fbf6e3;
+
+    --ink: #1c2421;
+    --ink-2: #4a5550;
+    --muted: #6b7671;
+    --line: #e3e8e5;
+    --surface: #ffffff;
+    --bg: #f4f6f5;
+
+    --ok: #1f8a4c;     --ok-bg: #e5f5ec;
+    --warn: #a86a00;   --warn-bg: #fff4dc;
+    --bad: #c0392b;    --bad-bg: #fdeceb;
+    --info: #1f6fb2;   --info-bg: #e7f1fb;
+
+    --radius: 14px;
+    --radius-sm: 10px;
+    --shadow: 0 1px 2px rgba(16, 32, 22, .06), 0 4px 16px rgba(16, 32, 22, .06);
+    --tabbar-h: 64px;
+    --topbar-h: 56px;
+    --sidebar-w: 248px;
+}
+
+/* ---------- Base ---------- */
+body.portal {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+.portal h1, .portal h2, .portal h3, .portal h4, .portal h5, .portal h6 { color: var(--ink); font-weight: 600; }
+/* :not(.btn) so link-styled buttons keep their own text colour (e.g. white on .btn-primary) */
+.portal a:not(.btn) { color: var(--brand); }
+.portal a:not(.btn):hover { color: var(--brand-700); }
+.portal .text-muted { color: var(--muted) !important; }
+
+.skip-link {
+    position: absolute; left: -999px; top: 8px; z-index: 2000;
+    background: var(--brand); color: #fff !important; padding: 8px 14px; border-radius: 8px;
+}
+.skip-link:focus { left: 8px; }
+
+.portal :focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* ---------- Brand mark ---------- */
+.portal-brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 700; color: var(--brand) !important; text-decoration: none !important; font-size: 1.05rem;
+}
+.portal-brand em { font-style: normal; color: var(--gold); font-weight: 600; }
+.portal-brand-mark {
+    width: 36px; height: 36px; border-radius: 10px; flex: none;
+    display: inline-grid; place-items: center;
+    background: var(--brand); color: var(--gold); font-weight: 800; font-size: 1.1rem;
+}
+
+/* ---------- Phone top bar ---------- */
+.portal-topbar {
+    position: sticky; top: 0; z-index: 1020;
+    height: var(--topbar-h);
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 16px; padding-top: env(safe-area-inset-top);
+    background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.portal-brand-sm .portal-brand-mark { width: 32px; height: 32px; font-size: 1rem; }
+.portal-brand-sm span:last-child { display: none; }
+.portal-topbar-title { flex: 1; font-weight: 600; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.portal-topbar-action {
+    width: 44px; height: 44px; display: grid; place-items: center;
+    border-radius: 12px; color: var(--muted) !important; text-decoration: none !important;
+}
+.portal-topbar-action:hover { background: var(--bg); color: var(--bad) !important; }
+
+/* ---------- Phone bottom tab bar ---------- */
+.portal-tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
+    display: flex; justify-content: space-around;
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface); border-top: 1px solid var(--line);
+    box-shadow: 0 -4px 16px rgba(16, 32, 22, .05);
+}
+.portal-tab {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    color: var(--muted) !important; text-decoration: none !important;
+    font-size: .7rem; font-weight: 500;
+}
+.portal-tab i { font-size: 1.15rem; }
+.portal-tab.active { color: var(--brand) !important; }
+.portal-tab.active i {
+    background: var(--brand-50); padding: 4px 16px; border-radius: 999px;
+}
+
+/* ---------- Sidebar (desktop only) ---------- */
+.portal-sidebar { display: none; }
+
+/* ---------- Main area ---------- */
+.portal-main { padding: 16px 16px calc(var(--tabbar-h) + 24px + env(safe-area-inset-bottom)); }
+.portal-container { max-width: 1120px; margin: 0 auto; }
+
+@media (min-width: 992px) {
+    .portal-topbar, .portal-tabbar { display: none; }
+    .portal-sidebar {
+        display: flex; flex-direction: column;
+        position: fixed; top: 0; bottom: 0; left: 0; width: var(--sidebar-w); z-index: 1030;
+        background: var(--brand-700); padding: 20px 14px;
+    }
+    .portal-sidebar .portal-brand { color: #fff !important; padding: 4px 10px 20px; }
+    .portal-sidebar .portal-brand-mark { background: var(--gold); color: var(--brand-700); }
+    .portal-nav { display: flex; flex-direction: column; gap: 4px; }
+    .portal-nav-link {
+        display: flex; align-items: center; gap: 12px;
+        padding: 11px 14px; border-radius: var(--radius-sm);
+        color: rgba(255, 255, 255, .78) !important; text-decoration: none !important; font-weight: 500;
+    }
+    .portal-nav-link:hover { background: rgba(255, 255, 255, .08); color: #fff !important; }
+    .portal-nav-link.active { background: rgba(212, 175, 55, .16); color: #fff !important; box-shadow: inset 3px 0 0 var(--gold); }
+    .portal-nav-link.active i { color: var(--gold); }
+    .portal-sidebar-foot { margin-top: auto; border-top: 1px solid rgba(255, 255, 255, .12); padding-top: 14px; }
+    .portal-user { display: flex; align-items: center; gap: 10px; padding: 6px 10px 12px; color: #fff; font-size: .9rem; }
+    .portal-user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .portal-avatar {
+        width: 34px; height: 34px; border-radius: 50%; flex: none;
+        display: grid; place-items: center; background: var(--gold); color: var(--brand-700); font-weight: 700;
+    }
+    .portal-logout:hover { background: rgba(192, 57, 43, .25) !important; }
+    .portal-main { margin-left: var(--sidebar-w); padding: 32px 36px 48px; }
+}
+
+/* ---------- Page heading ---------- */
+.page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.page-head h1 { font-size: 1.35rem; margin: 0; }
+.page-head p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+@media (min-width: 992px) { .page-head h1 { font-size: 1.6rem; } }
+
+/* ---------- Cards ---------- */
+.p-card, .portal .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.p-card { padding: 18px; margin-bottom: 16px; }
+@media (min-width: 768px) { .p-card { padding: 22px 24px; } }
+.p-card-title { display: flex; align-items: center; gap: 10px; font-size: 1.02rem; font-weight: 600; margin: 0 0 14px; }
+.p-card-title i { color: var(--brand); }
+.portal .card-header { background: transparent; border-bottom: 1px solid var(--line); font-weight: 600; }
+
+/* ---------- Stat tiles ---------- */
+.p-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+@media (min-width: 768px) { .p-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; } }
+.p-stat {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 16px; box-shadow: var(--shadow); min-width: 0;
+}
+.p-stat-label { font-size: .78rem; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .03em; }
+.p-stat-value { font-size: 1.3rem; font-weight: 700; margin-top: 4px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.p-stat-icon {
+    width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+    background: var(--brand-50); color: var(--brand); margin-bottom: 10px;
+}
+.p-stat.is-gold .p-stat-icon { background: var(--gold-50); color: #9a7a12; }
+.p-stat.is-bad .p-stat-icon { background: var(--bad-bg); color: var(--bad); }
+.p-stat.is-info .p-stat-icon { background: var(--info-bg); color: var(--info); }
+
+/* ---------- Hero / next payment ---------- */
+.p-hero {
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-700) 100%);
+    color: #fff; border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow);
+}
+.p-hero h2, .p-hero h3, .p-hero h4 { color: #fff; }
+.p-hero .p-hero-amount { font-size: 1.9rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.p-hero .p-hero-sub { opacity: .85; font-size: .9rem; }
+.p-hero .btn-light { color: var(--brand-700); font-weight: 600; }
+
+/* ---------- Status badges ---------- */
+.p-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; white-space: nowrap;
+}
+.p-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.p-badge-pending  { background: var(--warn-bg); color: var(--warn); }
+.p-badge-approved { background: var(--info-bg); color: var(--info); }
+.p-badge-active   { background: var(--brand-50); color: var(--brand); }
+.p-badge-done     { background: var(--ok-bg); color: var(--ok); }
+.p-badge-denied   { background: var(--bad-bg); color: var(--bad); }
+.p-badge-neutral  { background: var(--bg); color: var(--muted); }
+
+/* ---------- Buttons (44px+ touch targets) ---------- */
+.portal .btn { border-radius: var(--radius-sm); font-weight: 500; min-height: 44px; padding: .55rem 1.1rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.portal .btn-sm { min-height: 36px; padding: .35rem .8rem; font-size: .85rem; }
+.portal .btn-lg { min-height: 52px; font-size: 1.05rem; }
+.portal .btn-primary { background: var(--brand); border-color: var(--brand); }
+.portal .btn-primary:hover, .portal .btn-primary:focus { background: var(--brand-700); border-color: var(--brand-700); }
+.portal .btn-outline-primary { color: var(--brand); border-color: var(--brand); }
+.portal .btn-outline-primary:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
+.portal .btn-gold { background: var(--gold); border-color: var(--gold); color: var(--brand-700); font-weight: 600; }
+.portal .btn-gold:hover { background: #c9a227; color: var(--brand-700); }
+@media (max-width: 575.98px) { .btn-block-sm { width: 100%; } }
+
+/* ---------- Forms ---------- */
+.portal .form-group { margin-bottom: 1.1rem; }
+.portal label, .portal .form-label { font-weight: 500; font-size: .9rem; color: var(--ink-2); margin-bottom: 6px; }
+.portal .form-control, .portal .custom-select {
+    min-height: 46px; border-radius: var(--radius-sm); border: 1px solid #cfd8d3;
+    font-size: 16px; /* 16px stops iPhone zooming into fields */
+    color: var(--ink); background-color: #fff;
+}
+.portal textarea.form-control { min-height: 96px; }
+.portal .form-control:focus, .portal .custom-select:focus {
+    border-color: var(--brand); box-shadow: 0 0 0 3px rgba(26, 95, 42, .15);
+}
+.portal .form-text, .portal small.text-muted { font-size: .8rem; }
+.portal .input-group-text { border-radius: var(--radius-sm); background: var(--bg); border-color: #cfd8d3; }
+.portal .required::after, .portal .req::after { content: ' *'; color: var(--bad); }
+
+/* ---------- Alerts ---------- */
+.portal .alert { border-radius: var(--radius-sm); border: 0; padding: 14px 16px; }
+.portal .alert-success { background: var(--ok-bg); color: #145c33; }
+.portal .alert-danger  { background: var(--bad-bg); color: #8e2a20; }
+.portal .alert-warning { background: var(--warn-bg); color: #7a4e00; }
+.portal .alert-info    { background: var(--info-bg); color: #164f80; }
+
+/* ---------- Tables: real table on desktop, stacked cards on phones ---------- */
+.portal .table { color: var(--ink); margin-bottom: 0; }
+.portal .table thead th {
+    border-top: 0; border-bottom: 1px solid var(--line);
+    font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600;
+}
+.portal .table td { border-top: 1px solid var(--line); vertical-align: middle; }
+.portal .table td.num, .portal .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 767.98px) {
+    .table-stack thead { display: none; }
+    .table-stack, .table-stack tbody, .table-stack tr, .table-stack td { display: block; width: 100%; }
+    .table-stack tr {
+        background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+        padding: 8px 14px; margin-bottom: 10px;
+    }
+    .table-stack td {
+        display: flex; justify-content: space-between; align-items: center; gap: 12px;
+        border: 0 !important; padding: 7px 0 !important; text-align: right !important;
+    }
+    .table-stack td::before {
+        content: attr(data-label); flex: none; text-align: left;
+        font-size: .78rem; color: var(--muted); font-weight: 500;
+    }
+    .table-stack td[data-label=""]::before, .table-stack td:not([data-label])::before { content: none; }
+}
+
+/* ---------- Key/value list ---------- */
+.p-kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; margin: 0; }
+.p-kv dt { font-weight: 400; color: var(--muted); font-size: .9rem; }
+.p-kv dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- Progress ---------- */
+.portal .progress { height: 10px; border-radius: 999px; background: var(--brand-50); }
+.portal .progress-bar { background: var(--brand); border-radius: 999px; }
+
+/* ---------- Empty state ---------- */
+.p-empty { text-align: center; padding: 36px 16px; color: var(--muted); }
+.p-empty i { font-size: 2.2rem; color: var(--brand-100); margin-bottom: 12px; display: block; }
+.p-empty h3, .p-empty h4, .p-empty h5 { color: var(--ink); font-size: 1.05rem; }
+
+/* ---------- Quick actions (big tap targets) ---------- */
+.p-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+@media (min-width: 768px) { .p-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.p-action {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+    padding: 16px; min-height: 96px; border-radius: var(--radius);
+    background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+    color: var(--ink) !important; text-decoration: none !important; font-weight: 600; font-size: .92rem;
+}
+.p-action i { color: var(--brand); font-size: 1.25rem; }
+.p-action:hover { border-color: var(--brand); }
+.p-action.is-primary { background: var(--brand); border-color: var(--brand); color: #fff !important; }
+.p-action.is-primary i { color: var(--gold); }
+
+/* ---------- Modals ---------- */
+.portal .modal-content { border: 0; border-radius: var(--radius); }
+.portal .modal-header, .portal .modal-footer { border-color: var(--line); }
+
+/* ---------- Auth pages (login, register, password reset) ---------- */
+body.portal-auth {
+    min-height: 100vh;
+    background:
+        radial-gradient(1200px 500px at 50% -10%, rgba(212, 175, 55, .18), transparent 60%),
+        linear-gradient(180deg, var(--brand-700) 0, var(--brand) 260px, var(--bg) 260px);
+}
+.auth-shell { max-width: 460px; margin: 0 auto; padding: 28px 16px 40px; }
+.auth-shell:has(.auth-card-wide) { max-width: 760px; }
+.auth-brand { color: #fff !important; margin: 0 auto 22px; display: flex; justify-content: center; font-size: 1.15rem; }
+.auth-brand .portal-brand-mark { background: var(--gold); color: var(--brand-700); }
+.auth-card {
+    background: var(--surface); border-radius: 18px; box-shadow: 0 10px 40px rgba(13, 61, 22, .18);
+    padding: 26px 20px;
+}
+@media (min-width: 576px) { .auth-card { padding: 34px 32px; } }
+.auth-card h1 { font-size: 1.4rem; margin-bottom: 4px; }
+.auth-card .auth-lead { color: var(--muted); margin-bottom: 22px; font-size: .92rem; }
+.auth-footnote { text-align: center; margin-top: 18px; font-size: .88rem; }
+.auth-footnote a { color: var(--muted); }
+.auth-divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .82rem; margin: 18px 0; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+/* ---------- Utilities ---------- */
+.tabular { font-variant-numeric: tabular-nums; }
+.gap-2 { gap: .5rem; }
+.gap-3 { gap: 1rem; }

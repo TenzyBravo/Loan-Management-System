@@ -8,6 +8,7 @@ if(!isset($_SESSION['customer_id'])){
 include('db_connect.php');
 require_once __DIR__ . '/includes/finance.php';
 require_once __DIR__ . '/includes/borrower_rules.php';
+require_once __DIR__ . '/includes/portal_layout.php';
 
 $customer_id = $_SESSION['customer_id'];
 
@@ -48,543 +49,316 @@ $stmt = $conn->prepare("SELECT * FROM loan_plan ORDER BY months ASC");
 $stmt->execute();
 $loan_plans = $stmt->get_result();
 $stmt->close();
+
+// Page-specific layout: steps on the left, sticky summary on the right (desktop only)
+$page_head = <<<'HTML'
+<style>
+    .step-num {
+        width: 28px; height: 28px; border-radius: 50%; flex: none;
+        display: inline-grid; place-items: center;
+        background: var(--brand); color: #fff; font-size: .85rem; font-weight: 700;
+    }
+    .rate-ref { background: var(--brand-50); border-radius: var(--radius-sm); padding: 14px 16px; }
+    .rate-ref-value { font-size: 1.2rem; font-weight: 700; color: var(--brand); }
+    .summary-card { border-top: 4px solid var(--gold); }
+    .calc-heading { font-size: .95rem; font-weight: 600; color: var(--brand); margin-bottom: 12px; }
+    #calculation-box.is-pending .calc-heading { color: var(--warn); }
+    #calculation-box .p-kv dt { padding-top: 2px; }
+    #calculation-box .calc-total-label { color: var(--ink); font-weight: 600; border-top: 1px solid var(--line); padding-top: 10px; }
+    #calculation-box .calc-total-value { font-size: 1.25rem; color: var(--brand); border-top: 1px solid var(--line); padding-top: 8px; }
+    @media (min-width: 992px) {
+        .apply-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; column-gap: 24px; align-items: start; }
+        .apply-grid > .apply-step { grid-column: 1; }
+        .apply-grid > .apply-summary { grid-column: 2; grid-row: 1 / span 4; position: sticky; top: 24px; }
+    }
+</style>
+HTML;
+
+portal_header('Apply for Loan', 'apply', ['head' => $page_head]);
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apply for Loan | Basils Money Lenders</title>
-    
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    
-    <style>
-        body {
-            background: #f5f6fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .sidebar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px 0;
-            position: fixed;
-            width: 250px;
-        }
-        .sidebar .brand {
-            color: white;
-            text-align: center;
-            padding: 20px;
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-        .sidebar .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 25px;
-            margin: 5px 15px;
-            border-radius: 8px;
-        }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active {
-            background: rgba(255,255,255,0.2);
-            color: white;
-        }
-        .main-content {
-            margin-left: 250px;
-            padding: 30px;
-        }
-        .application-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            padding: 40px;
-        }
-        .card-header-custom {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px 10px 0 0;
-            margin: -40px -40px 30px -40px;
-        }
-        .form-label {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 8px;
-        }
-        .form-control, .form-select {
-            border-radius: 8px;
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-        }
-        .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-        .btn-submit {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            padding: 12px 40px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 600;
-        }
-        .btn-submit:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-            color: white;
-        }
-        .info-box {
-            background: #e3f2fd;
-            border-left: 4px solid #2196f3;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .plan-card {
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .plan-card:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
-        }
-        .plan-card.selected {
-            border-color: #667eea;
-            background: #f8f9ff;
-            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
-        }
-        .plan-card input[type="radio"] {
-            display: none;
-        }
-        .calculation-box {
-            background: #fff3e0;
-            border-left: 4px solid #ff9800;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
-        }
-        .calculation-box h5 {
-            color: #f57c00;
-            margin-bottom: 15px;
-        }
-        .calc-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #ffe0b2;
-        }
-        .calc-item:last-child {
-            border-bottom: none;
-            font-weight: bold;
-            font-size: 1.1rem;
-            color: #f57c00;
-        }
-
-        /* Mobile Menu Toggle */
-        .mobile-menu-toggle {
-            display: none;
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            z-index: 1001;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 15px;
-            border-radius: 8px;
-            font-size: 1.2rem;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 999;
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-            .mobile-menu-toggle {
-                display: block;
-            }
-
-            .sidebar {
-                left: -250px;
-                transition: left 0.3s ease;
-                z-index: 1000;
-            }
-
-            .sidebar.active {
-                left: 0;
-            }
-
-            .sidebar-overlay.active {
-                display: block;
-            }
-
-            .main-content {
-                margin-left: 0;
-                padding: 80px 15px 30px 15px;
-            }
-
-            .application-card {
-                padding: 20px;
-            }
-
-            .card-header-custom {
-                margin: -20px -20px 20px -20px;
-                padding: 15px;
-            }
-
-            .plan-card {
-                padding: 15px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Mobile Menu Toggle -->
-    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
-        <i class="fas fa-bars"></i>
-    </button>
-    <div class="sidebar-overlay" onclick="toggleMobileMenu()"></div>
-
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="brand">
-            <i class="fas fa-hand-holding-usd"></i><br>
-            Basils Money Lenders
+    <div class="page-head">
+        <div>
+            <h1>Apply for a Loan</h1>
+            <p>Fill out the form below to submit your loan application</p>
         </div>
-        <nav class="nav flex-column mt-4">
-            <a class="nav-link" href="customer_dashboard.php">
-                <i class="fas fa-tachometer-alt"></i> Dashboard
-            </a>
-            <a class="nav-link active" href="customer_apply_loan.php">
-                <i class="fas fa-plus-circle"></i> Apply for Loan
-            </a>
-            <a class="nav-link" href="customer_my_loans.php">
-                <i class="fas fa-list"></i> My Loans
-            </a>
-            <a class="nav-link" href="customer_my_documents.php">
-                <i class="fas fa-file-alt"></i> My Documents
-            </a>
-            <a class="nav-link" href="customer_profile.php">
-                <i class="fas fa-user"></i> My Profile
-            </a>
-            <hr style="border-color: rgba(255,255,255,0.2); margin: 15px;">
-            <a class="nav-link" href="customer_logout.php" style="color: #ff6b6b !important;">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
     </div>
 
-    <!-- Main Content -->
-    <div class="main-content">
-        <div class="container-fluid">
-            <div class="row">
-                <div class="col-12">
-                    <h2 class="mb-4"><i class="fas fa-plus-circle"></i> Apply for a Loan</h2>
-                    
-                    <?php if(isset($_SESSION['error_msg'])): ?>
-                        <div class="alert alert-danger alert-dismissible fade show">
-                            <i class="fas fa-exclamation-circle"></i>
-                            <?php echo $_SESSION['error_msg']; unset($_SESSION['error_msg']); ?>
-                            <button type="button" class="close" data-dismiss="alert">&times;</button>
-                        </div>
-                    <?php endif; ?>
+    <?php if(isset($_SESSION['error_msg'])): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle"></i>
+            <?php echo $_SESSION['error_msg']; unset($_SESSION['error_msg']); ?>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">&times;</button>
+        </div>
+    <?php endif; ?>
 
-                    <?php if(isset($_SESSION['warning_msg'])): ?>
-                        <div class="alert alert-warning alert-dismissible fade show">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <?php echo $_SESSION['warning_msg']; unset($_SESSION['warning_msg']); ?>
-                            <button type="button" class="close" data-dismiss="alert">&times;</button>
-                        </div>
-                    <?php endif; ?>
+    <?php if(isset($_SESSION['warning_msg'])): ?>
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-triangle"></i>
+            <?php echo $_SESSION['warning_msg']; unset($_SESSION['warning_msg']); ?>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">&times;</button>
+        </div>
+    <?php endif; ?>
 
-                    <?php if ($open_loan !== null): ?>
-                        <!-- One loan at a time: no form while a loan is open -->
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i>
-                            <?php echo openLoanMessage($open_loan, true); ?>
-                            <div class="mt-2">
-                                <a href="customer_my_loans.php" class="btn btn-primary btn-sm">View My Loans</a>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                    <div class="application-card">
-                        <div class="card-header-custom">
-                            <h4 class="mb-0"><i class="fas fa-file-contract"></i> Loan Application Form</h4>
-                            <p class="mb-0 mt-2" style="opacity: 0.9;">Fill out the form below to submit your loan application</p>
-                        </div>
-
-                        <div class="info-box">
-                            <i class="fas fa-info-circle"></i>
-                            <strong>Before you apply:</strong> Make sure all your documents are uploaded and verified. 
-                            Applications are reviewed within 24-48 hours.
-                        </div>
-
-                        <form id="loan-application-form" method="POST" action="customer_apply_loan_process.php">
-                            
-                            <!-- Loan Type -->
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-tag"></i> Loan Type *
-                                </label>
-                                <select class="form-control" name="loan_type_id" id="loan_type" required>
-                                    <option value="">Select Loan Type</option>
-                                    <?php while($type = $loan_types->fetch_assoc()): ?>
-                                        <option value="<?php echo $type['id']; ?>">
-                                            <?php echo $type['type_name']; ?> - <?php echo $type['description']; ?>
-                                        </option>
-                                    <?php endwhile; ?>
-                                </select>
-                            </div>
-
-                            <!-- Loan Amount -->
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-dollar-sign"></i> Loan Amount *
-                                </label>
-                                <input type="number" class="form-control" name="amount" id="loan_amount" 
-                                       placeholder="Enter amount" min="1000" max="1000000" required>
-                                <small class="form-text text-muted">Minimum: K 1,000 | Maximum: K 1,000,000</small>
-                            </div>
-
-                            <!-- Purpose -->
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-bullseye"></i> Purpose of Loan *
-                                </label>
-                                <textarea class="form-control" name="purpose" rows="4" 
-                                          placeholder="Describe the purpose of this loan..." required></textarea>
-                            </div>
-
-                            <!-- Repayment Term -->
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-calendar-alt"></i> Repayment Term *
-                                </label>
-                                <select class="form-control" name="term_choice" id="term_choice" required>
-                                    <option value="">Select repayment term</option>
-                                    <optgroup label="Weekly loans - fixed rate, one repayment at the end">
-                                        <?php foreach (AppConfig::WEEKLY_RATES as $weeks => $rate): ?>
-                                            <option value="week:<?php echo $weeks; ?>" data-rate="<?php echo $rate; ?>" data-count="<?php echo $weeks; ?>" data-unit="week">
-                                                <?php echo formatLoanTerm($weeks, 'week'); ?> - <?php echo rtrim(rtrim(number_format($rate, 2), '0'), '.'); ?>% total interest
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </optgroup>
-                                    <optgroup label="Monthly loans">
-                                        <option value="month:1" data-rate="18" data-count="1" data-unit="month">1 month - 18% total interest</option>
-                                        <option value="month:multi" data-unit="month">2 or more months - rate set by our team</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-
-                            <div class="form-group" id="months-group" style="display: none;">
-                                <label class="form-label">
-                                    <i class="fas fa-hourglass-half"></i> Number of Months *
-                                </label>
-                                <input type="number" class="form-control" name="duration_months" id="duration_months"
-                                       placeholder="Enter number of months" min="2" max="120">
-                                <small class="form-text text-muted">Loans of 2 or more months are repaid monthly; the interest rate is set by our team after review.</small>
-                            </div>
-
-                            <!-- Current Rates (reference) -->
-                            <div class="form-group">
-                                <div class="plan-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 10px; background: #d1fae5; border-left: 4px solid #10b981;">
-                                    <h6 class="mb-2"><i class="fas fa-percent text-success"></i> Current Rates <small class="text-muted">(effective 1 November 2026)</small></h6>
-                                    <div class="row text-center">
-                                        <?php foreach (AppConfig::WEEKLY_RATES as $weeks => $rate): ?>
-                                            <div class="col-6 col-md-3 mb-2">
-                                                <h5 class="mb-0"><?php echo rtrim(rtrim(number_format($rate, 2), '0'), '.'); ?>%</h5>
-                                                <small class="text-muted"><?php echo formatLoanTerm($weeks, 'week'); ?></small>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    </div>
-                                    <small class="text-muted">
-                                        1-month loans: 18% total interest. 2+ month loans: rate set after review.
-                                        <strong>All loans are collateral based.</strong>
-                                    </small>
-                                </div>
-                            </div>
-
-                            <!-- Collateral -->
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-shield-alt"></i> Collateral Offered *
-                                </label>
-                                <textarea class="form-control" name="collateral_description" id="collateral_description" rows="3"
-                                          placeholder="Describe the item(s) you are offering as collateral, e.g. Toyota Corolla 2012, reg. ABC 1234" required></textarea>
-                                <small class="form-text text-muted">All loans are collateral based. Our team will verify the collateral before approval.</small>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-coins"></i> Estimated Collateral Value (K) <small class="text-muted">(optional)</small>
-                                </label>
-                                <input type="number" class="form-control" name="collateral_value" id="collateral_value"
-                                       placeholder="Estimated value in Kwacha" min="0" step="0.01">
-                            </div>
-
-                            <!-- Loan Calculation Display -->
-                            <div class="calculation-box" id="calculation-box" style="display: none;">
-                                <h5><i class="fas fa-calculator"></i> Loan Calculation</h5>
-                                <div class="calc-item">
-                                    <span>Loan Amount:</span>
-                                    <span id="calc-principal">K 0.00</span>
-                                </div>
-                                <div class="calc-item">
-                                    <span>Interest (<span id="calc-interest-rate">0</span>):</span>
-                                    <span id="calc-interest">K 0.00</span>
-                                </div>
-                                <div class="calc-item">
-                                    <span>Total Amount:</span>
-                                    <span id="calc-total">K 0.00</span>
-                                </div>
-                                <div class="calc-item">
-                                    <span id="calc-installment-label">Repayment:</span>
-                                    <span id="calc-monthly">K 0.00</span>
-                                </div>
-                            </div>
-
-                            <!-- Terms and Conditions -->
-                            <div class="form-group mt-4">
-                                <div class="custom-control custom-checkbox">
-                                    <input type="checkbox" class="custom-control-input" id="terms" name="terms" required>
-                                    <label class="custom-control-label" for="terms">
-                                        I confirm that all information provided is accurate and I agree to the 
-                                        <a href="#" target="_blank">Terms and Conditions</a>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- Submit Button -->
-                            <div class="text-right mt-4">
-                                <a href="customer_dashboard.php" class="btn btn-secondary">
-                                    <i class="fas fa-times"></i> Cancel
-                                </a>
-                                <button type="submit" class="btn btn-submit">
-                                    <i class="fas fa-paper-plane"></i> Submit Application
-                                </button>
-                            </div>
-
-                        </form>
-                    </div>
-                    <?php endif; ?>
-                </div>
+    <?php if ($open_loan !== null): ?>
+        <!-- One loan at a time: no form while a loan is open -->
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <?php echo openLoanMessage($open_loan, true); ?>
+            <div class="mt-3">
+                <a href="customer_my_loans.php" class="btn btn-primary btn-sm">View My Loans</a>
             </div>
         </div>
+    <?php else: ?>
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <strong>Before you apply:</strong> Make sure all your documents are uploaded and verified.
+        Applications are reviewed within 24-48 hours.
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <script>
-        // Show the months field only for 2+ month loans
-        $('#term_choice').on('change', function(){
-            var isMulti = $(this).val() === 'month:multi';
-            $('#months-group').toggle(isMulti);
-            $('#duration_months').prop('required', isMulti);
-            calculateLoan();
-        });
+    <form id="loan-application-form" method="POST" action="customer_apply_loan_process.php">
+        <div class="apply-grid">
 
-        // Recalculate when amount or months change
-        $('#loan_amount, #duration_months').on('change keyup', function(){
-            calculateLoan();
-        });
+            <!-- Step 1: Loan details -->
+            <section class="p-card apply-step" aria-labelledby="step1-title">
+                <h2 class="p-card-title" id="step1-title"><span class="step-num">1</span> Loan details</h2>
 
-        function formatK(value) {
-            return 'K ' + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                <div class="form-group">
+                    <label class="req" for="loan_type">Loan Type</label>
+                    <select class="form-control" name="loan_type_id" id="loan_type" required>
+                        <option value="">Select Loan Type</option>
+                        <?php while($type = $loan_types->fetch_assoc()): ?>
+                            <option value="<?php echo $type['id']; ?>">
+                                <?php echo htmlspecialchars($type['type_name']); ?> - <?php echo htmlspecialchars((string) $type['description']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="req" for="loan_amount">Loan Amount</label>
+                    <div class="input-group">
+                        <div class="input-group-prepend"><span class="input-group-text">K</span></div>
+                        <input type="number" class="form-control tabular" name="amount" id="loan_amount"
+                               placeholder="Enter amount" min="1000" max="1000000" inputmode="numeric" required>
+                    </div>
+                    <small class="form-text text-muted">Minimum: K 1,000 | Maximum: K 1,000,000</small>
+                </div>
+
+                <div class="form-group mb-0">
+                    <label class="req" for="purpose">Purpose of Loan</label>
+                    <textarea class="form-control" name="purpose" id="purpose" rows="4"
+                              placeholder="Describe the purpose of this loan..." required></textarea>
+                </div>
+            </section>
+
+            <!-- Step 2: Repayment term -->
+            <section class="p-card apply-step" aria-labelledby="step2-title">
+                <h2 class="p-card-title" id="step2-title"><span class="step-num">2</span> Repayment term</h2>
+
+                <div class="form-group">
+                    <label class="req" for="term_choice">Repayment Term</label>
+                    <select class="form-control" name="term_choice" id="term_choice" required>
+                        <option value="">Select repayment term</option>
+                        <optgroup label="Weekly loans - fixed rate, one repayment at the end">
+                            <?php foreach (AppConfig::WEEKLY_RATES as $weeks => $rate): ?>
+                                <option value="week:<?php echo $weeks; ?>" data-rate="<?php echo $rate; ?>" data-count="<?php echo $weeks; ?>" data-unit="week">
+                                    <?php echo formatLoanTerm($weeks, 'week'); ?> - <?php echo rtrim(rtrim(number_format($rate, 2), '0'), '.'); ?>% total interest
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                        <optgroup label="Monthly loans">
+                            <option value="month:1" data-rate="18" data-count="1" data-unit="month">1 month - 18% total interest</option>
+                            <option value="month:multi" data-unit="month">2 or more months - rate set by our team</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="form-group" id="months-group" style="display: none;">
+                    <label class="req" for="duration_months">Number of Months</label>
+                    <input type="number" class="form-control tabular" name="duration_months" id="duration_months"
+                           placeholder="Enter number of months" min="2" max="120" inputmode="numeric">
+                    <small class="form-text text-muted">Loans of 2 or more months are repaid monthly; the interest rate is set by our team after review.</small>
+                </div>
+
+                <!-- Current Rates (reference) -->
+                <div class="rate-ref">
+                    <h3 class="h6 mb-2"><i class="fas fa-percent text-success"></i> Current Rates <small class="text-muted">(effective 1 November 2026)</small></h3>
+                    <div class="row text-center">
+                        <?php foreach (AppConfig::WEEKLY_RATES as $weeks => $rate): ?>
+                            <div class="col-6 col-md-3 mb-2">
+                                <div class="rate-ref-value tabular"><?php echo rtrim(rtrim(number_format($rate, 2), '0'), '.'); ?>%</div>
+                                <small class="text-muted"><?php echo formatLoanTerm($weeks, 'week'); ?></small>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <small class="text-muted">
+                        1-month loans: 18% total interest. 2+ month loans: rate set after review.
+                        <strong>All loans are collateral based.</strong>
+                    </small>
+                </div>
+            </section>
+
+            <!-- Step 3: Collateral -->
+            <section class="p-card apply-step" aria-labelledby="step3-title">
+                <h2 class="p-card-title" id="step3-title"><span class="step-num">3</span> Collateral</h2>
+
+                <div class="form-group">
+                    <label class="req" for="collateral_description">Collateral Offered</label>
+                    <textarea class="form-control" name="collateral_description" id="collateral_description" rows="3"
+                              placeholder="Describe the item(s) you are offering as collateral, e.g. Toyota Corolla 2012, reg. ABC 1234" required></textarea>
+                    <small class="form-text text-muted">All loans are collateral based. Our team will verify the collateral before approval.</small>
+                </div>
+
+                <div class="form-group mb-0">
+                    <label for="collateral_value">Estimated Collateral Value (K) <small class="text-muted">(optional)</small></label>
+                    <input type="number" class="form-control tabular" name="collateral_value" id="collateral_value"
+                           placeholder="Estimated value in Kwacha" min="0" step="0.01" inputmode="decimal">
+                </div>
+            </section>
+
+            <!-- Loan summary: sticky on desktop, above the submit step on phones -->
+            <aside class="apply-summary" aria-live="polite">
+                <div class="p-card summary-card">
+                    <h2 class="p-card-title"><i class="fas fa-receipt"></i> Loan summary</h2>
+                    <p class="text-muted mb-0" id="calc-empty">Enter a loan amount and choose a repayment term to see your total payable.</p>
+
+                    <!-- Loan Calculation Display -->
+                    <div id="calculation-box" style="display: none;">
+                        <h5 class="calc-heading"><i class="fas fa-calculator"></i> Loan Calculation</h5>
+                        <dl class="p-kv">
+                            <dt>Loan Amount:</dt>
+                            <dd id="calc-principal" class="tabular">K 0.00</dd>
+
+                            <dt>Interest (<span id="calc-interest-rate">0</span>):</dt>
+                            <dd id="calc-interest" class="tabular">K 0.00</dd>
+
+                            <dt class="calc-total-label">Total Amount:</dt>
+                            <dd id="calc-total" class="calc-total-value tabular">K 0.00</dd>
+
+                            <dt id="calc-installment-label">Repayment:</dt>
+                            <dd id="calc-monthly" class="tabular">K 0.00</dd>
+                        </dl>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Step 4: Review & submit -->
+            <section class="p-card apply-step" aria-labelledby="step4-title">
+                <h2 class="p-card-title" id="step4-title"><span class="step-num">4</span> Review &amp; submit</h2>
+
+                <!-- Terms and Conditions -->
+                <div class="form-group">
+                    <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input" id="terms" name="terms" required>
+                        <label class="custom-control-label" for="terms">
+                            I confirm that all information provided is accurate and I agree to the
+                            <a href="#" target="_blank">Terms and Conditions</a>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-flex flex-column-reverse flex-sm-row justify-content-sm-end gap-2">
+                    <a href="customer_dashboard.php" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-gold btn-lg">
+                        <i class="fas fa-paper-plane"></i> Submit Application
+                    </button>
+                </div>
+            </section>
+
+        </div>
+    </form>
+    <?php endif; ?>
+<?php
+$page_scripts = <<<'HTML'
+<script>
+    // Show the months field only for 2+ month loans
+    $('#term_choice').on('change', function(){
+        var isMulti = $(this).val() === 'month:multi';
+        $('#months-group').toggle(isMulti);
+        $('#duration_months').prop('required', isMulti);
+        calculateLoan();
+    });
+
+    // Recalculate when amount or months change
+    $('#loan_amount, #duration_months').on('change keyup', function(){
+        calculateLoan();
+    });
+
+    function formatK(value) {
+        return 'K ' + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    function calculateLoan() {
+        // Display only - the server recalculates every figure on submission
+        var amount = parseFloat($('#loan_amount').val());
+        var option = $('#term_choice option:selected');
+        var choice = option.val();
+
+        if(!amount || !choice) {
+            $('#calculation-box').slideUp();
+            $('#calc-empty').show();
+            return;
         }
 
-        function calculateLoan() {
-            // Display only - the server recalculates every figure on submission
-            var amount = parseFloat($('#loan_amount').val());
-            var option = $('#term_choice option:selected');
-            var choice = option.val();
+        var rate = parseFloat(option.data('rate'));
+        var unit = option.data('unit');
 
-            if(!amount || !choice) {
-                $('#calculation-box').slideUp();
-                return;
-            }
+        if(choice === 'month:multi') {
+            var months = parseInt($('#duration_months').val());
+            $('#calc-principal').text(formatK(amount));
+            $('#calc-interest-rate').text('rate set by our team after review');
+            $('#calc-interest').html('<em>Pending review</em>');
+            $('#calc-total').html('<em>Calculated once the rate is set</em>');
+            $('#calc-installment-label').text('Monthly Payment' + (months ? ' (' + months + ' months):' : ':'));
+            $('#calc-monthly').html('<em>Pending review</em>');
+            $('#calculation-box').addClass('is-pending');
+            $('#calculation-box h5').html('<i class="fas fa-info-circle"></i> Loan Information');
+        } else {
+            var count = parseInt(option.data('count'));
+            // TOTAL interest on the principal (not annual)
+            var totalInterest = amount * (rate / 100);
+            var totalAmount = amount + totalInterest;
 
-            var rate = parseFloat(option.data('rate'));
-            var unit = option.data('unit');
+            $('#calc-principal').text(formatK(amount));
+            $('#calc-interest-rate').text(rate + '% total');
+            $('#calc-interest').text(formatK(totalInterest));
+            $('#calc-total').text(formatK(totalAmount));
 
-            if(choice === 'month:multi') {
-                var months = parseInt($('#duration_months').val());
-                $('#calc-principal').text(formatK(amount));
-                $('#calc-interest-rate').text('rate set by our team after review');
-                $('#calc-interest').html('<em>Pending review</em>');
-                $('#calc-total').html('<em>Calculated once the rate is set</em>');
-                $('#calc-installment-label').text('Monthly Payment' + (months ? ' (' + months + ' months):' : ':'));
-                $('#calc-monthly').html('<em>Pending review</em>');
-                $('#calculation-box').css({'background': '#fff3cd', 'border-left': '4px solid #f59e0b'});
-                $('#calculation-box h5').html('<i class="fas fa-info-circle"></i> Loan Information').css('color', '#f57c00');
+            if(unit === 'week') {
+                var due = new Date();
+                due.setDate(due.getDate() + count * 7);
+                $('#calc-installment-label').text('One repayment, due ' + count + ' week' + (count > 1 ? 's' : '') + ' after release (about ' + due.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) + '):');
+                $('#calc-monthly').text(formatK(totalAmount));
             } else {
-                var count = parseInt(option.data('count'));
-                // TOTAL interest on the principal (not annual)
-                var totalInterest = amount * (rate / 100);
-                var totalAmount = amount + totalInterest;
-
-                $('#calc-principal').text(formatK(amount));
-                $('#calc-interest-rate').text(rate + '% total');
-                $('#calc-interest').text(formatK(totalInterest));
-                $('#calc-total').text(formatK(totalAmount));
-
-                if(unit === 'week') {
-                    var due = new Date();
-                    due.setDate(due.getDate() + count * 7);
-                    $('#calc-installment-label').text('One repayment, due ' + count + ' week' + (count > 1 ? 's' : '') + ' after release (about ' + due.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'}) + '):');
-                    $('#calc-monthly').text(formatK(totalAmount));
-                } else {
-                    $('#calc-installment-label').text('Repayment after 1 month:');
-                    $('#calc-monthly').text(formatK(totalAmount));
-                }
-
-                $('#calculation-box').css({'background': '#d1fae5', 'border-left': '4px solid #10b981'});
-                $('#calculation-box h5').html('<i class="fas fa-calculator"></i> Loan Calculation').css('color', '#059669');
+                $('#calc-installment-label').text('Repayment after 1 month:');
+                $('#calc-monthly').text(formatK(totalAmount));
             }
 
-            $('#calculation-box').slideDown();
+            $('#calculation-box').removeClass('is-pending');
+            $('#calculation-box h5').html('<i class="fas fa-calculator"></i> Loan Calculation');
         }
 
-        // Form validation
-        $('#loan-application-form').on('submit', function(e){
-            if(!$('input[name="terms"]').is(':checked')) {
-                e.preventDefault();
-                alert('Please accept the terms and conditions');
-                return false;
-            }
-            if(!$.trim($('#collateral_description').val())) {
-                e.preventDefault();
-                alert('All loans are collateral based. Please describe the collateral you are offering.');
-                return false;
-            }
-        });
+        $('#calc-empty').hide();
+        $('#calculation-box').slideDown();
+    }
 
-        // Mobile menu toggle
-        function toggleMobileMenu() {
-            $('.sidebar').toggleClass('active');
-            $('.sidebar-overlay').toggleClass('active');
+    // Form validation
+    $('#loan-application-form').on('submit', function(e){
+        if(!$('input[name="terms"]').is(':checked')) {
+            e.preventDefault();
+            alert('Please accept the terms and conditions');
+            return false;
         }
+        if(!$.trim($('#collateral_description').val())) {
+            e.preventDefault();
+            alert('All loans are collateral based. Please describe the collateral you are offering.');
+            return false;
+        }
+    });
+</script>
+HTML;
 
-        // Close sidebar when clicking a nav link on mobile
-        $('.sidebar .nav-link').on('click', function() {
-            if ($(window).width() <= 768) {
-                $('.sidebar').removeClass('active');
-                $('.sidebar-overlay').removeClass('active');
-            }
-        });
-    </script>
-</body>
-</html>
+portal_footer(['scripts' => $page_scripts]);

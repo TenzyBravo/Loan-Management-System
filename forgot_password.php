@@ -84,9 +84,9 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <style>
                         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+                        .header { background: linear-gradient(135deg, #1a5f2a 0%, #0d3d16 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
                         .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-                        .btn { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                        .btn { display: inline-block; background: #1a5f2a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
                         .footer { text-align: center; color: #666; font-size: 12px; margin-top: 20px; }
                     </style>
                 </head>
@@ -146,128 +146,56 @@ if($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+require_once __DIR__ . '/includes/portal_layout.php';
+
+$pageHead = <<<'HTML'
+<style>
+    .auth-icon {
+        width: 56px; height: 56px; border-radius: 16px; margin-bottom: 14px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: var(--brand-50); color: var(--brand); font-size: 1.4rem;
+    }
+</style>
+HTML;
+
+portal_auth_header('Forgot Password', ['head' => $pageHead]);
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password | Basils Money Lenders</title>
+    <span class="auth-icon" aria-hidden="true"><i class="fas fa-key"></i></span>
+    <h1>Forgot Password?</h1>
+    <p class="auth-lead">Enter your email address and we'll send you a link to reset your password.</p>
 
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
-    <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .forgot-container {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            padding: 40px;
-            max-width: 450px;
-            width: 100%;
-            margin: 20px;
-        }
-        .forgot-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .forgot-header i {
-            font-size: 60px;
-            color: #667eea;
-            margin-bottom: 15px;
-        }
-        .forgot-header h3 {
-            color: #333;
-            font-weight: 600;
-        }
-        .forgot-header p {
-            color: #666;
-        }
-        .form-control {
-            border-radius: 8px;
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-        }
-        .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-        .btn-reset {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: 600;
-            width: 100%;
-            color: white;
-        }
-        .btn-reset:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-            color: white;
-        }
-        .back-link {
-            text-align: center;
-            margin-top: 20px;
-        }
-        .back-link a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        .alert {
-            border-radius: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div class="forgot-container">
-        <div class="forgot-header">
-            <i class="fas fa-key"></i>
-            <h3>Forgot Password?</h3>
-            <p>Enter your email address and we'll send you a link to reset your password.</p>
+    <?php if($error): ?>
+        <div class="alert alert-danger" role="alert">
+            <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
         </div>
+    <?php endif; ?>
 
-        <?php if($error): ?>
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
-            </div>
-        <?php endif; ?>
-
-        <?php if($success): ?>
-            <div class="alert alert-success">
-                <i class="fas fa-check-circle"></i> <?php echo $success; ?>
-            </div>
-        <?php else: ?>
-            <form method="POST" action="">
-                <div class="form-group">
-                    <label for="email"><i class="fas fa-envelope"></i> Email Address</label>
-                    <input type="email" class="form-control" id="email" name="email"
-                           placeholder="Enter your registered email" required>
-                </div>
-
-                <button type="submit" class="btn btn-reset">
-                    <i class="fas fa-paper-plane"></i> Send Reset Link
-                </button>
-            </form>
-        <?php endif; ?>
-
-        <div class="back-link">
-            <a href="customer_login.php">
-                <i class="fas fa-arrow-left"></i> Back to Login
-            </a>
+    <?php if($success): ?>
+        <div class="alert alert-success" role="status">
+            <i class="fas fa-check-circle"></i> <?php echo $success; ?>
         </div>
-    </div>
+    <?php else: ?>
+        <form method="POST" action="">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" class="form-control" id="email" name="email"
+                       placeholder="Enter your registered email" autocomplete="email"
+                       autocapitalize="none" spellcheck="false" required>
+            </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+            <button type="submit" class="btn btn-primary btn-block btn-lg">
+                <i class="fas fa-paper-plane"></i> Send Reset Link
+            </button>
+        </form>
+    <?php endif; ?>
+
+    <div class="auth-divider">or</div>
+
+    <p class="text-center mb-0">
+        <a href="customer_login.php" class="font-weight-bold">
+            <i class="fas fa-arrow-left"></i> Back to Login
+        </a>
+    </p>
+<?php
+portal_auth_footer();

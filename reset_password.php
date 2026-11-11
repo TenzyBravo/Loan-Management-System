@@ -121,279 +121,166 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && $valid_token && $reset_data) {
         }
     }
 }
+
+require_once __DIR__ . '/includes/portal_layout.php';
+
+$pageHead = <<<'HTML'
+<style>
+    .auth-icon {
+        width: 56px; height: 56px; border-radius: 16px; margin-bottom: 14px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: var(--brand-50); color: var(--brand); font-size: 1.4rem;
+    }
+    .auth-icon.is-success { background: var(--ok-bg); color: var(--ok); }
+    .auth-icon.is-error { background: var(--bad-bg); color: var(--bad); }
+    .password-requirements {
+        background: var(--bg); padding: 12px 14px; border-radius: var(--radius-sm);
+        margin-bottom: 18px; font-size: .84rem; color: var(--ink-2);
+    }
+    .password-requirements ul { margin: 4px 0 0; padding-left: 18px; }
+    .password-requirements ul li { color: var(--muted); transition: color .2s; }
+    .password-requirements ul li.valid { color: var(--ok); }
+    .password-requirements ul li.valid::before { content: '\2713  '; font-weight: 700; }
+    .password-strength { height: 5px; width: 0; border-radius: 3px; margin-top: 6px; transition: all .3s; }
+    /* link-styled buttons: keep white text (".portal a" would turn it green) */
+    .auth-card a.btn-primary, .auth-card a.btn-primary:hover, .auth-card a.btn-primary:focus { color: #fff; text-decoration: none; }
+</style>
+HTML;
+
+$pageScripts = <<<'HTML'
+<script>
+    // Password strength indicator with requirement validation
+    $('#password').on('input', function() {
+        var password = $(this).val();
+        var strength = 0;
+        var bar = $('#password-strength');
+
+        // Check each requirement
+        var hasLength = password.length >= 8;
+        var hasLowercase = password.match(/[a-z]/);
+        var hasUppercase = password.match(/[A-Z]/);
+        var hasNumber = password.match(/[0-9]/);
+        var hasSpecial = password.match(/[^a-zA-Z0-9]/);
+
+        // Update requirement list
+        $('#req-length').toggleClass('valid', hasLength);
+        $('#req-lowercase').toggleClass('valid', hasLowercase);
+        $('#req-uppercase').toggleClass('valid', hasUppercase);
+        $('#req-number').toggleClass('valid', hasNumber);
+        $('#req-special').toggleClass('valid', hasSpecial);
+
+        // Calculate strength
+        if (hasLength) strength++;
+        if (hasLowercase) strength++;
+        if (hasUppercase) strength++;
+        if (hasNumber) strength++;
+        if (hasSpecial) strength++;
+
+        var colors = ['#dc3545', '#fd7e14', '#ffc107', '#28a745', '#20c997'];
+        var widths = ['20%', '40%', '60%', '80%', '100%'];
+        var labels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+
+        if (password.length > 0) {
+            bar.css({
+                'width': widths[strength - 1] || '20%',
+                'background': colors[strength - 1] || '#dc3545'
+            });
+            bar.attr('title', labels[strength - 1] || 'Very Weak');
+        } else {
+            bar.css('width', '0');
+            // Reset all requirement indicators
+            $('.password-requirements ul li').removeClass('valid');
+        }
+    });
+
+    // Password match validation
+    $('#confirm_password').on('input blur', function() {
+        if ($(this).val() && $(this).val() !== $('#password').val()) {
+            $(this).addClass('is-invalid');
+        } else {
+            $(this).removeClass('is-invalid');
+        }
+    });
+</script>
+HTML;
+
+portal_auth_header('Reset Password', ['head' => $pageHead]);
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Password | Basils Money Lenders</title>
+    <?php if($success): ?>
+        <span class="auth-icon is-success" aria-hidden="true"><i class="fas fa-check-circle"></i></span>
+        <h1>Password Reset Successful!</h1>
+        <p class="auth-lead"><?php echo $success; ?></p>
+        <a href="customer_login.php" class="btn btn-primary btn-block btn-lg">
+            <i class="fas fa-sign-in-alt"></i> Go to Login
+        </a>
 
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <?php elseif($error && !$valid_token): ?>
+        <span class="auth-icon is-error" aria-hidden="true"><i class="fas fa-exclamation-circle"></i></span>
+        <h1>Link Expired</h1>
+        <p class="auth-lead"><?php echo $error; ?></p>
+        <a href="forgot_password.php" class="btn btn-primary btn-block btn-lg">
+            <i class="fas fa-redo"></i> Request New Link
+        </a>
 
-    <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .reset-container {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            padding: 40px;
-            max-width: 450px;
-            width: 100%;
-            margin: 20px;
-        }
-        .reset-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .reset-header i {
-            font-size: 60px;
-            color: #667eea;
-            margin-bottom: 15px;
-        }
-        .reset-header.success i {
-            color: #28a745;
-        }
-        .reset-header.error i {
-            color: #dc3545;
-        }
-        .reset-header h3 {
-            color: #333;
-            font-weight: 600;
-        }
-        .reset-header p {
-            color: #666;
-        }
-        .form-control {
-            border-radius: 8px;
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-        }
-        .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-        .btn-reset {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: 600;
-            width: 100%;
-            color: white;
-        }
-        .btn-reset:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-            color: white;
-        }
-        .btn-login {
-            background: #28a745;
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: 600;
-            width: 100%;
-            color: white;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-        }
-        .btn-login:hover {
-            background: #218838;
-            color: white;
-            text-decoration: none;
-        }
-        .back-link {
-            text-align: center;
-            margin-top: 20px;
-        }
-        .back-link a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        .alert {
-            border-radius: 8px;
-        }
-        .password-requirements {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
-        }
-        .password-requirements ul {
-            margin-bottom: 0;
-            padding-left: 20px;
-        }
-        .password-strength {
-            height: 5px;
-            border-radius: 3px;
-            margin-top: 5px;
-            transition: all 0.3s;
-        }
-        .password-requirements ul li {
-            color: #666;
-            transition: color 0.3s;
-        }
-        .password-requirements ul li.valid {
-            color: #28a745;
-        }
-        .password-requirements ul li.valid::before {
-            content: '✓ ';
-            font-weight: bold;
-        }
-    </style>
-</head>
-<body>
-    <div class="reset-container">
-        <?php if($success): ?>
-            <div class="reset-header success">
-                <i class="fas fa-check-circle"></i>
-                <h3>Password Reset Successful!</h3>
-                <p><?php echo $success; ?></p>
+    <?php elseif($valid_token): ?>
+        <span class="auth-icon" aria-hidden="true"><i class="fas fa-lock"></i></span>
+        <h1>Create New Password</h1>
+        <p class="auth-lead">Hello <?php echo htmlspecialchars($reset_data['firstname']); ?>, enter your new password below.</p>
+
+        <?php if($error): ?>
+            <div class="alert alert-danger" role="alert">
+                <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
             </div>
-            <a href="customer_login.php" class="btn-login">
-                <i class="fas fa-sign-in-alt"></i> Go to Login
-            </a>
-
-        <?php elseif($error && !$valid_token): ?>
-            <div class="reset-header error">
-                <i class="fas fa-exclamation-circle"></i>
-                <h3>Link Expired</h3>
-                <p><?php echo $error; ?></p>
-            </div>
-            <a href="forgot_password.php" class="btn-reset" style="text-decoration: none; display: block; text-align: center;">
-                <i class="fas fa-redo"></i> Request New Link
-            </a>
-
-        <?php elseif($valid_token): ?>
-            <div class="reset-header">
-                <i class="fas fa-lock"></i>
-                <h3>Create New Password</h3>
-                <p>Hello <?php echo htmlspecialchars($reset_data['firstname']); ?>, enter your new password below.</p>
-            </div>
-
-            <?php if($error): ?>
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
-                </div>
-            <?php endif; ?>
-
-            <div class="password-requirements">
-                <strong><i class="fas fa-info-circle"></i> Password Requirements:</strong>
-                <ul>
-                    <li id="req-length">At least 8 characters long</li>
-                    <li id="req-uppercase">At least one uppercase letter (A-Z)</li>
-                    <li id="req-lowercase">At least one lowercase letter (a-z)</li>
-                    <li id="req-number">At least one number (0-9)</li>
-                    <li id="req-special">At least one special character (!@#$%^&*)</li>
-                </ul>
-            </div>
-
-            <form method="POST" action="">
-                <input type="hidden" name="token" value="<?php echo htmlspecialchars($token); ?>">
-
-                <div class="form-group">
-                    <label for="password"><i class="fas fa-lock"></i> New Password</label>
-                    <input type="password" class="form-control" id="password" name="password"
-                           placeholder="Enter new password" minlength="8" required>
-                    <div class="password-strength" id="password-strength"></div>
-                </div>
-
-                <div class="form-group">
-                    <label for="confirm_password"><i class="fas fa-lock"></i> Confirm Password</label>
-                    <input type="password" class="form-control" id="confirm_password" name="confirm_password"
-                           placeholder="Confirm new password" minlength="8" required>
-                </div>
-
-                <button type="submit" class="btn btn-reset">
-                    <i class="fas fa-save"></i> Reset Password
-                </button>
-            </form>
-
-        <?php else: ?>
-            <div class="reset-header error">
-                <i class="fas fa-exclamation-circle"></i>
-                <h3>Invalid Request</h3>
-                <p>No reset token provided. Please use the link from your email.</p>
-            </div>
-            <a href="forgot_password.php" class="btn-reset" style="text-decoration: none; display: block; text-align: center;">
-                <i class="fas fa-redo"></i> Request Password Reset
-            </a>
         <?php endif; ?>
 
-        <div class="back-link">
-            <a href="customer_login.php">
-                <i class="fas fa-arrow-left"></i> Back to Login
-            </a>
+        <div class="password-requirements">
+            <strong><i class="fas fa-info-circle"></i> Password Requirements:</strong>
+            <ul>
+                <li id="req-length">At least 8 characters long</li>
+                <li id="req-uppercase">At least one uppercase letter (A-Z)</li>
+                <li id="req-lowercase">At least one lowercase letter (a-z)</li>
+                <li id="req-number">At least one number (0-9)</li>
+                <li id="req-special">At least one special character (!@#$%^&amp;*)</li>
+            </ul>
         </div>
-    </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Password strength indicator with requirement validation
-        $('#password').on('input', function() {
-            var password = $(this).val();
-            var strength = 0;
-            var bar = $('#password-strength');
+        <form method="POST" action="">
+            <input type="hidden" name="token" value="<?php echo htmlspecialchars($token); ?>">
 
-            // Check each requirement
-            var hasLength = password.length >= 8;
-            var hasLowercase = password.match(/[a-z]/);
-            var hasUppercase = password.match(/[A-Z]/);
-            var hasNumber = password.match(/[0-9]/);
-            var hasSpecial = password.match(/[^a-zA-Z0-9]/);
+            <div class="form-group">
+                <label for="password">New Password</label>
+                <input type="password" class="form-control" id="password" name="password"
+                       placeholder="Enter new password" minlength="8" autocomplete="new-password" required>
+                <div class="password-strength" id="password-strength"></div>
+            </div>
 
-            // Update requirement list
-            $('#req-length').toggleClass('valid', hasLength);
-            $('#req-lowercase').toggleClass('valid', hasLowercase);
-            $('#req-uppercase').toggleClass('valid', hasUppercase);
-            $('#req-number').toggleClass('valid', hasNumber);
-            $('#req-special').toggleClass('valid', hasSpecial);
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" class="form-control" id="confirm_password" name="confirm_password"
+                       placeholder="Confirm new password" minlength="8" autocomplete="new-password" required>
+                <div class="invalid-feedback">Passwords do not match.</div>
+            </div>
 
-            // Calculate strength
-            if (hasLength) strength++;
-            if (hasLowercase) strength++;
-            if (hasUppercase) strength++;
-            if (hasNumber) strength++;
-            if (hasSpecial) strength++;
+            <button type="submit" class="btn btn-primary btn-block btn-lg">
+                <i class="fas fa-save"></i> Reset Password
+            </button>
+        </form>
 
-            var colors = ['#dc3545', '#fd7e14', '#ffc107', '#28a745', '#20c997'];
-            var widths = ['20%', '40%', '60%', '80%', '100%'];
-            var labels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+    <?php else: ?>
+        <span class="auth-icon is-error" aria-hidden="true"><i class="fas fa-exclamation-circle"></i></span>
+        <h1>Invalid Request</h1>
+        <p class="auth-lead">No reset token provided. Please use the link from your email.</p>
+        <a href="forgot_password.php" class="btn btn-primary btn-block btn-lg">
+            <i class="fas fa-redo"></i> Request Password Reset
+        </a>
+    <?php endif; ?>
 
-            if (password.length > 0) {
-                bar.css({
-                    'width': widths[strength - 1] || '20%',
-                    'background': colors[strength - 1] || '#dc3545'
-                });
-                bar.attr('title', labels[strength - 1] || 'Very Weak');
-            } else {
-                bar.css('width', '0');
-                // Reset all requirement indicators
-                $('.password-requirements ul li').removeClass('valid');
-            }
-        });
+    <div class="auth-divider">or</div>
 
-        // Password match validation
-        $('#confirm_password').on('input blur', function() {
-            if ($(this).val() && $(this).val() !== $('#password').val()) {
-                $(this).addClass('is-invalid');
-            } else {
-                $(this).removeClass('is-invalid');
-            }
-        });
-    </script>
-</body>
-</html>
+    <p class="text-center mb-0">
+        <a href="customer_login.php" class="font-weight-bold">
+            <i class="fas fa-arrow-left"></i> Back to Login
+        </a>
+    </p>
+<?php
+portal_auth_footer(['scripts' => $pageScripts]);

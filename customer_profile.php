@@ -19,218 +19,50 @@ $stmt->bind_param("i", $customer_id);
 $stmt->execute();
 $documents = $stmt->get_result();
 $stmt->close();
+
+require_once __DIR__ . '/includes/portal_layout.php';
+
+$page_head = <<<'HTML'
+<style>
+    .profile-summary { display: flex; align-items: center; gap: 16px; }
+    .profile-avatar {
+        flex: 0 0 64px; width: 64px; height: 64px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--brand); color: var(--gold); font-size: 1.6rem; font-weight: 700;
+    }
+    .profile-summary-main { min-width: 0; }
+    .profile-summary-main h2 { font-size: 1.15rem; margin: 0; overflow-wrap: anywhere; }
+    .profile-summary-main p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
+    .doc-status-row { padding: 14px 0; border-top: 1px solid var(--line); }
+    .doc-status-row:first-of-type { border-top: 0; padding-top: 0; }
+    .doc-status-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .doc-status-head h3 { font-size: .95rem; margin: 0; }
+    .doc-status-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .doc-status-actions .btn { flex: 1 1 auto; }
+    .portal .custom-file, .portal .custom-file-input, .portal .custom-file-label { min-height: 44px; }
+    .portal .custom-file-label { display: flex; align-items: center; overflow: hidden; }
+    .portal .custom-file-label::after { height: 100%; display: flex; align-items: center; }
+</style>
+HTML;
+
+$avatar_name = trim((string)($customer['firstname'] ?? ''));
+$avatar_initial = $avatar_name !== '' ? strtoupper(substr($avatar_name, 0, 1)) : '';
+
+portal_header('My Profile', 'profile', ['head' => $page_head]);
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile | Basils Money Lenders</title>
-    
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    
-    <style>
-        body {
-            background: #f5f6fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .sidebar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px 0;
-            position: fixed;
-            width: 250px;
-        }
-        .sidebar .brand {
-            color: white;
-            text-align: center;
-            padding: 20px;
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-        .sidebar .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 25px;
-            margin: 5px 15px;
-            border-radius: 8px;
-        }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active {
-            background: rgba(255,255,255,0.2);
-            color: white;
-        }
-        .main-content {
-            margin-left: 250px;
-            padding: 30px;
-        }
-        .profile-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            padding: 30px;
-            margin-bottom: 20px;
-        }
-        .profile-header {
-            text-align: center;
-            padding: 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-            margin-bottom: 30px;
-        }
-        .profile-avatar {
-            width: 120px;
-            height: 120px;
-            background: white;
-            border-radius: 50%;
-            margin: 0 auto 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 60px;
-            color: #667eea;
-        }
-        .section-title {
-            border-bottom: 2px solid #f0f0f0;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-            color: #667eea;
-            font-weight: 600;
-        }
-        .document-card {
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
-            transition: all 0.3s;
-        }
-        .document-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.2);
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
 
-        /* Mobile Menu Toggle */
-        .mobile-menu-toggle {
-            display: none;
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            z-index: 1001;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 15px;
-            border-radius: 8px;
-            font-size: 1.2rem;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        }
+            <div class="page-head">
+                <div>
+                    <h1>My Profile</h1>
+                    <p>Your personal details, password and documents</p>
+                </div>
+            </div>
 
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 999;
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-            .mobile-menu-toggle {
-                display: block;
-            }
-
-            .sidebar {
-                left: -250px;
-                transition: left 0.3s ease;
-                z-index: 1000;
-            }
-
-            .sidebar.active {
-                left: 0;
-            }
-
-            .sidebar-overlay.active {
-                display: block;
-            }
-
-            .main-content {
-                margin-left: 0;
-                padding: 80px 15px 30px 15px;
-            }
-
-            .profile-header {
-                padding: 20px;
-            }
-
-            .profile-avatar {
-                width: 80px;
-                height: 80px;
-                font-size: 40px;
-            }
-
-            .profile-card {
-                padding: 20px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Mobile Menu Toggle -->
-    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
-        <i class="fas fa-bars"></i>
-    </button>
-    <div class="sidebar-overlay" onclick="toggleMobileMenu()"></div>
-
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="brand">
-            <i class="fas fa-hand-holding-usd"></i><br>
-            Basils Money Lenders
-        </div>
-        <nav class="nav flex-column mt-4">
-            <a class="nav-link" href="customer_dashboard.php">
-                <i class="fas fa-tachometer-alt"></i> Dashboard
-            </a>
-            <a class="nav-link" href="customer_apply_loan.php">
-                <i class="fas fa-plus-circle"></i> Apply for Loan
-            </a>
-            <a class="nav-link" href="customer_my_loans.php">
-                <i class="fas fa-list"></i> My Loans
-            </a>
-            <a class="nav-link" href="customer_my_documents.php">
-                <i class="fas fa-file-alt"></i> My Documents
-            </a>
-            <a class="nav-link active" href="customer_profile.php">
-                <i class="fas fa-user"></i> My Profile
-            </a>
-            <hr style="border-color: rgba(255,255,255,0.2); margin: 15px;">
-            <a class="nav-link" href="customer_logout.php" style="color: #ff6b6b !important;">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
-    </div>
-
-    <!-- Main Content -->
-    <div class="main-content">
-        <div class="container-fluid">
-            
             <?php if(isset($_SESSION['success_msg'])): ?>
                 <div class="alert alert-success alert-dismissible fade show">
                     <i class="fas fa-check-circle"></i>
                     <?php echo $_SESSION['success_msg']; unset($_SESSION['success_msg']); ?>
-                    <button type="button" class="close" data-dismiss="alert">&times;</button>
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">&times;</button>
                 </div>
             <?php endif; ?>
 
@@ -238,48 +70,56 @@ $stmt->close();
                 <div class="alert alert-danger alert-dismissible fade show">
                     <i class="fas fa-exclamation-circle"></i>
                     <?php echo $_SESSION['error_msg']; unset($_SESSION['error_msg']); ?>
-                    <button type="button" class="close" data-dismiss="alert">&times;</button>
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">&times;</button>
                 </div>
             <?php endif; ?>
 
             <!-- Profile Header -->
-            <div class="profile-header">
-                <div class="profile-avatar">
-                    <i class="fas fa-user"></i>
+            <div class="p-card">
+                <div class="profile-summary">
+                    <span class="profile-avatar" aria-hidden="true">
+                        <?php if($avatar_initial !== ''): ?>
+                            <?php echo htmlspecialchars($avatar_initial); ?>
+                        <?php else: ?>
+                            <i class="fas fa-user"></i>
+                        <?php endif; ?>
+                    </span>
+                    <div class="profile-summary-main">
+                        <h2><?php echo htmlspecialchars($customer['firstname'] . ' ' . $customer['lastname']); ?></h2>
+                        <p><?php echo htmlspecialchars((string)$customer['email']); ?></p>
+                    </div>
                 </div>
-                <h3><?php echo $customer['firstname'] . ' ' . $customer['lastname']; ?></h3>
-                <p class="mb-0"><?php echo $customer['email']; ?></p>
             </div>
 
             <div class="row">
                 <!-- Personal Information -->
-                <div class="col-md-8">
-                    <div class="profile-card">
-                        <h5 class="section-title">
+                <div class="col-lg-8">
+                    <div class="p-card">
+                        <h2 class="p-card-title">
                             <i class="fas fa-user-edit"></i> Personal Information
-                        </h5>
-                        
+                        </h2>
+
                         <form method="POST" action="customer_update_profile.php">
                             <div class="row">
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>First Name</label>
-                                        <input type="text" class="form-control" name="firstname" 
-                                               value="<?php echo $customer['firstname']; ?>" required>
+                                        <label class="req" for="pf-firstname">First Name</label>
+                                        <input type="text" class="form-control" name="firstname" id="pf-firstname" autocomplete="given-name"
+                                               value="<?php echo htmlspecialchars((string)$customer['firstname']); ?>" required>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>Middle Name</label>
-                                        <input type="text" class="form-control" name="middlename" 
-                                               value="<?php echo $customer['middlename']; ?>">
+                                        <label for="pf-middlename">Middle Name</label>
+                                        <input type="text" class="form-control" name="middlename" id="pf-middlename" autocomplete="additional-name"
+                                               value="<?php echo htmlspecialchars((string)$customer['middlename']); ?>">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>Last Name</label>
-                                        <input type="text" class="form-control" name="lastname" 
-                                               value="<?php echo $customer['lastname']; ?>" required>
+                                        <label class="req" for="pf-lastname">Last Name</label>
+                                        <input type="text" class="form-control" name="lastname" id="pf-lastname" autocomplete="family-name"
+                                               value="<?php echo htmlspecialchars((string)$customer['lastname']); ?>" required>
                                     </div>
                                 </div>
                             </div>
@@ -287,67 +127,68 @@ $stmt->close();
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>Email Address</label>
-                                        <input type="email" class="form-control" name="email" 
-                                               value="<?php echo $customer['email']; ?>" required>
+                                        <label class="req" for="pf-email">Email Address</label>
+                                        <input type="email" class="form-control" name="email" id="pf-email" autocomplete="email"
+                                               value="<?php echo htmlspecialchars((string)$customer['email']); ?>" required>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>Contact Number</label>
-                                        <input type="text" class="form-control" name="contact_no" 
-                                               value="<?php echo $customer['contact_no']; ?>" required>
+                                        <label class="req" for="pf-contact">Contact Number</label>
+                                        <input type="tel" class="form-control" name="contact_no" id="pf-contact" autocomplete="tel"
+                                               value="<?php echo htmlspecialchars((string)$customer['contact_no']); ?>" required>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="form-group">
-                                <label>Address</label>
-                                <textarea class="form-control" name="address" rows="3" required><?php echo $customer['address']; ?></textarea>
+                                <label class="req" for="pf-address">Address</label>
+                                <textarea class="form-control" name="address" id="pf-address" rows="3" autocomplete="street-address" required><?php echo htmlspecialchars((string)$customer['address']); ?></textarea>
                             </div>
 
                             <div class="form-group">
-                                <label>Tax ID / SSN</label>
-                                <input type="text" class="form-control" name="tax_id" 
-                                       value="<?php echo $customer['tax_id']; ?>" required>
+                                <label class="req" for="pf-tax-id">Tax ID / SSN</label>
+                                <input type="text" class="form-control" name="tax_id" id="pf-tax-id"
+                                       value="<?php echo htmlspecialchars((string)$customer['tax_id']); ?>" required>
                             </div>
 
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn btn-primary btn-lg">
                                 <i class="fas fa-save"></i> Save Changes
                             </button>
                         </form>
                     </div>
 
                     <!-- Change Password -->
-                    <div class="profile-card">
-                        <h5 class="section-title">
+                    <div class="p-card">
+                        <h2 class="p-card-title">
                             <i class="fas fa-lock"></i> Change Password
-                        </h5>
-                        
+                        </h2>
+
                         <form method="POST" action="customer_change_password.php">
                             <div class="form-group">
-                                <label>Current Password</label>
-                                <input type="password" class="form-control" name="current_password" required>
+                                <label class="req" for="current_password">Current Password</label>
+                                <input type="password" class="form-control" name="current_password" id="current_password" autocomplete="current-password" required>
                             </div>
 
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>New Password</label>
-                                        <input type="password" class="form-control" name="new_password" 
-                                               id="new_password" minlength="8" required>
+                                        <label class="req" for="new_password">New Password</label>
+                                        <input type="password" class="form-control" name="new_password"
+                                               id="new_password" minlength="8" autocomplete="new-password" required>
+                                        <small class="form-text text-muted">At least 8 characters</small>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>Confirm New Password</label>
-                                        <input type="password" class="form-control" name="confirm_password" 
-                                               id="confirm_password" minlength="8" required>
+                                        <label class="req" for="confirm_password">Confirm New Password</label>
+                                        <input type="password" class="form-control" name="confirm_password"
+                                               id="confirm_password" minlength="8" autocomplete="new-password" required>
                                     </div>
                                 </div>
                             </div>
 
-                            <button type="submit" class="btn btn-warning">
+                            <button type="submit" class="btn btn-gold btn-lg">
                                 <i class="fas fa-key"></i> Change Password
                             </button>
                         </form>
@@ -355,24 +196,27 @@ $stmt->close();
                 </div>
 
                 <!-- Documents Section -->
-                <div class="col-md-4">
-                    <div class="profile-card">
-                        <h5 class="section-title">
+                <div class="col-lg-4">
+                    <div class="p-card">
+                        <h2 class="p-card-title">
                             <i class="fas fa-file-upload"></i> My Documents
-                        </h5>
-                        
-                        <?php 
+                        </h2>
+
+                        <?php
                         $doc_types = array('id' => 'Government ID', 'employment_proof' => 'Employment Proof', 'payslip' => 'Pay Slip');
                         $doc_array = array();
                         while($doc = $documents->fetch_assoc()) {
                             $doc_array[$doc['document_type']] = $doc;
                         }
-                        
+
+                        // Map the Bootstrap status colours to portal badges
+                        $doc_badge_map = array('secondary' => 'p-badge-neutral', 'warning' => 'p-badge-pending', 'success' => 'p-badge-done', 'danger' => 'p-badge-denied');
+
                         foreach($doc_types as $key => $label):
                             $doc_status_class = 'secondary';
                             $doc_status_text = 'Not Uploaded';
                             $has_doc = false;
-                            
+
                             if(isset($doc_array[$key])) {
                                 $has_doc = true;
                                 $doc = $doc_array[$key];
@@ -380,86 +224,87 @@ $stmt->close();
                                 $doc_status_text = $doc['status'] == 0 ? 'Pending Verification' : ($doc['status'] == 1 ? 'Verified' : 'Rejected');
                             }
                         ?>
-                        
-                        <div class="document-card">
-                            <h6><?php echo $label; ?></h6>
-                            <span class="badge badge-<?php echo $doc_status_class; ?>"><?php echo $doc_status_text; ?></span>
-                            <br><br>
-                            
+
+                        <div class="doc-status-row">
+                            <div class="doc-status-head">
+                                <h3><?php echo $label; ?></h3>
+                                <span class="p-badge <?php echo $doc_badge_map[$doc_status_class]; ?>"><?php echo $doc_status_text; ?></span>
+                            </div>
+
+                            <?php if($has_doc && $doc['verification_notes']): ?>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <i class="fas fa-comment"></i> <?php echo htmlspecialchars((string)$doc['verification_notes']); ?>
+                                </small>
+                            </div>
+                            <?php endif; ?>
+
+                            <div class="doc-status-actions">
                             <?php if($has_doc): ?>
-                                <a href="<?php echo $doc['file_path']; ?>" target="_blank" class="btn btn-sm btn-info">
+                                <a href="<?php echo htmlspecialchars((string)$doc['file_path']); ?>" target="_blank" rel="noopener" class="btn btn-outline-primary">
                                     <i class="fas fa-eye"></i> View
                                 </a>
                                 <?php if($doc['status'] != 1): ?>
-                                <button class="btn btn-sm btn-primary update-doc-btn" 
+                                <button type="button" class="btn btn-gold update-doc-btn"
                                         data-type="<?php echo $key; ?>"
                                         data-label="<?php echo $label; ?>">
                                     <i class="fas fa-upload"></i> Update
                                 </button>
                                 <?php endif; ?>
                             <?php else: ?>
-                                <button class="btn btn-sm btn-primary update-doc-btn" 
+                                <button type="button" class="btn btn-gold update-doc-btn"
                                         data-type="<?php echo $key; ?>"
                                         data-label="<?php echo $label; ?>">
                                     <i class="fas fa-upload"></i> Upload
                                 </button>
                             <?php endif; ?>
-                            
-                            <?php if($has_doc && $doc['verification_notes']): ?>
-                            <div class="mt-2">
-                                <small class="text-muted">
-                                    <i class="fas fa-comment"></i> <?php echo $doc['verification_notes']; ?>
-                                </small>
                             </div>
-                            <?php endif; ?>
                         </div>
-                        
+
                         <?php endforeach; ?>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
     <!-- Document Update Modal -->
-    <div class="modal fade" id="update-doc-modal" tabindex="-1" role="dialog">
-        <div class="modal-dialog" role="document">
+    <div class="modal fade" id="update-doc-modal" tabindex="-1" role="dialog" aria-labelledby="update-doc-modal-title">
+        <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title"><i class="fas fa-upload"></i> Update Document</h5>
-                    <button type="button" class="close text-white" data-dismiss="modal">
-                        <span>&times;</span>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="update-doc-modal-title"><i class="fas fa-upload"></i> Update Document</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <form method="POST" action="customer_update_document.php" enctype="multipart/form-data">
                     <div class="modal-body">
                         <input type="hidden" name="document_type" id="doc-type">
-                        
+
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle"></i>
                             You are updating: <strong id="doc-label"></strong>
                         </div>
 
                         <div class="form-group">
-                            <label>Select New File</label>
+                            <label class="req" for="update-doc-file">Select New File</label>
                             <div class="custom-file">
-                                <input type="file" class="custom-file-input" name="document" 
+                                <input type="file" class="custom-file-input" id="update-doc-file" name="document"
                                        accept=".jpg,.jpeg,.png,.pdf" required>
-                                <label class="custom-file-label">Choose file...</label>
+                                <label class="custom-file-label" for="update-doc-file">Choose file...</label>
                             </div>
                             <small class="form-text text-muted">
                                 Accepted formats: JPG, PNG, PDF (Max 5MB)
                             </small>
                         </div>
 
-                        <div class="form-group">
-                            <label>Reason for Update</label>
-                            <textarea class="form-control" name="reason" rows="3" 
+                        <div class="form-group mb-0">
+                            <label for="update-doc-reason">Reason for Update</label>
+                            <textarea class="form-control" name="reason" id="update-doc-reason" rows="3"
                                       placeholder="Please explain why you're updating this document..."></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-upload"></i> Upload Document
                         </button>
@@ -469,49 +314,35 @@ $stmt->close();
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <script>
-        // Update document modal
-        $('.update-doc-btn').click(function(){
-            var type = $(this).data('type');
-            var label = $(this).data('label');
-            
-            $('#doc-type').val(type);
-            $('#doc-label').text(label);
-            $('#update-doc-modal').modal('show');
-        });
+<?php
+portal_footer(['scripts' => <<<'HTML'
+<script>
+    // Update document modal
+    $('.update-doc-btn').click(function(){
+        var type = $(this).data('type');
+        var label = $(this).data('label');
 
-        // Update file input label
-        $('.custom-file-input').on('change', function() {
-            var fileName = $(this).val().split('\\').pop();
-            $(this).next('.custom-file-label').html(fileName);
-        });
+        $('#doc-type').val(type);
+        $('#doc-label').text(label);
+        $('#update-doc-modal').modal('show');
+    });
 
-        // Password match validation
-        $('#confirm_password').on('blur', function() {
-            if ($(this).val() !== $('#new_password').val()) {
-                $(this).addClass('is-invalid');
-                alert('Passwords do not match!');
-            } else {
-                $(this).removeClass('is-invalid');
-            }
-        });
+    // Update file input label
+    $('.custom-file-input').on('change', function() {
+        var fileName = $(this).val().split('\\').pop();
+        $(this).next('.custom-file-label').html(fileName);
+    });
 
-        // Mobile menu toggle
-        function toggleMobileMenu() {
-            $('.sidebar').toggleClass('active');
-            $('.sidebar-overlay').toggleClass('active');
+    // Password match validation
+    $('#confirm_password').on('blur', function() {
+        if ($(this).val() !== $('#new_password').val()) {
+            $(this).addClass('is-invalid');
+            alert('Passwords do not match!');
+        } else {
+            $(this).removeClass('is-invalid');
         }
-
-        // Close sidebar when clicking a nav link on mobile
-        $('.sidebar .nav-link').on('click', function() {
-            if ($(window).width() <= 768) {
-                $('.sidebar').removeClass('active');
-                $('.sidebar-overlay').removeClass('active');
-            }
-        });
-    </script>
-</body>
-</html>
+    });
+</script>
+HTML
+]);
+?>
