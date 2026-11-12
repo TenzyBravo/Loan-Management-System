@@ -81,7 +81,7 @@ if (preg_match('/^week:(\d+)$/', $term_choice, $m)) {
 // ---------------------------------------------------------------
 // Calculate the loan
 // - Weekly loans: fixed rate by length (15/20/25/30%)
-// - 1-month loans: fixed 18%
+// - 1-month loans: fixed at the 4-week rate (AppConfig::ONE_MONTH_RATE)
 // - 2+ month loans: rate set by staff at review (stored as 0 until then;
 //   totals below are an 18% preview and are recalculated on approval)
 // ---------------------------------------------------------------

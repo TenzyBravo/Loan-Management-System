@@ -793,7 +793,7 @@
                         <h3 class="loan-title">Personal Loans</h3>
                         <p class="loan-desc">For personal expenses, emergencies, or any purpose you need. Quick and easy application.</p>
                         <div class="loan-rate">15% &ndash; 30% <span>interest</span></div>
-                        <p class="mt-2 text-muted">1 week 15% &middot; 2 weeks 20% &middot; 3 weeks 25% &middot; 4 weeks 30%<br>1 month 18% &middot; All loans are collateral based</p>
+                        <p class="mt-2 text-muted">1 week 15% &middot; 2 weeks 20% &middot; 3 weeks 25% &middot; 4 weeks or 1 month 30%<br>All loans are collateral based</p>
                     </div>
                 </div>
                 <div class="col-md-4 mb-4">

@@ -12,16 +12,16 @@ const DEFAULT_INTEREST_RATE = 18.0;
  * Calculate loan with TOTAL interest (not annual)
  *
  * BUSINESS RULES:
- * - 1-month loans: ALWAYS 18% TOTAL interest (auto-applied)
+ * - 1-month loans: ALWAYS AppConfig::ONE_MONTH_RATE TOTAL interest (same as 4 weeks, auto-applied)
  * - Multi-month loans: Interest rate MUST be set by administrator (TOTAL interest, not annual)
  * - All rates are TOTAL interest applied to principal, regardless of duration
  */
 function calculateLoan(float $principal, float $interestRate, int $months, string $calculationType = 'simple'): array {
     $isRateNotSet = false;
 
-    // STRICT BUSINESS RULE: 1-month loans = 18% TOTAL (auto-applied)
+    // STRICT BUSINESS RULE: 1-month loans = the 4-week rate (auto-applied)
     if ($months == 1) {
-        $interestRate = 18.0;
+        $interestRate = (float) AppConfig::ONE_MONTH_RATE;
         $isRateNotSet = false; // Rate is correctly set by business rule
     }
     // Multi-month loans: Rate MUST be provided by admin
@@ -53,7 +53,7 @@ function calculateLoan(float $principal, float $interestRate, int $months, strin
         'monthly_installment' => round($monthlyInstallment, 2),
         'currency' => 'K', // Zambian Kwacha
         'rate_not_set' => $isRateNotSet, // Flag: Admin must set rate for multi-month loans
-        'is_one_month' => ($months == 1), // Flag: Auto-applied 18% TOTAL rate
+        'is_one_month' => ($months == 1), // Flag: Auto-applied fixed 1-month rate
         'term_unit' => 'month',
         'installment_count' => $months,
         'fixed_rate' => ($months == 1),

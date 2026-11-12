@@ -72,12 +72,18 @@ final class FinanceTest extends TestCase
         $this->assertSame(1150.0, $calc['total_payable']);
     }
 
-    public function testOneMonthLoanStaysFixedAt18Percent(): void
+    public function testOneMonthLoanUsesTheFourWeekRate(): void
     {
-        $calc = calculateLoanForTerm(1000.0, 30.0, 1, 'month');
-        $this->assertSame(18.0, $calc['interest_rate']);
-        $this->assertSame(1180.0, $calc['total_payable']);
+        // 4 weeks is a month: 1-month loans are fixed at 30%, whatever rate is passed in
+        $calc = calculateLoanForTerm(1000.0, 18.0, 1, 'month');
+        $this->assertSame(30.0, $calc['interest_rate']);
+        $this->assertSame(1300.0, $calc['total_payable']);
         $this->assertSame('month', $calc['term_unit']);
+    }
+
+    public function testOneMonthRateMatchesFourWeekRate(): void
+    {
+        $this->assertSame(AppConfig::WEEKLY_RATES[4], AppConfig::ONE_MONTH_RATE);
     }
 
     public function testMultiMonthLoanUsesStaffRateAsTotalInterest(): void

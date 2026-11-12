@@ -234,7 +234,7 @@ if(isset($_GET['id'])){
 					$parts = [];
 					foreach (AppConfig::WEEKLY_RATES as $w => $r) { $parts[] = formatLoanTerm($w, 'week') . ' ' . rtrim(rtrim(number_format($r, 2), '0'), '.') . '%'; }
 					echo implode(', ', $parts);
-				?>), repaid in one payment. 1-month loans are fixed at 18%. For longer loans, select the rate based on risk assessment.
+				?>), repaid in one payment. 1-month loans are fixed at <?php echo (float) AppConfig::ONE_MONTH_RATE ?>% (same as 4 weeks). For longer loans, select the rate based on risk assessment.
 			</div>
 
 			<div class="row">
@@ -243,7 +243,7 @@ if(isset($_GET['id'])){
 					<select name="interest_rate" id="interest_rate" class="custom-select browser-default" required>
 						<option value="0" <?php echo (!isset($interest_rate) || $interest_rate == 0) ? "selected" : '' ?>>Not Set (Pending Review)</option>
 						<option value="10.0" <?php echo isset($interest_rate) && $interest_rate == 10.0 ? "selected" : '' ?>>10% Total - Low Risk</option>
-						<option value="18.0" <?php echo isset($interest_rate) && $interest_rate == 18.0 ? "selected" : '' ?>>18% Total - Standard (Auto for 1-month)</option>
+						<option value="18.0" <?php echo isset($interest_rate) && $interest_rate == 18.0 ? "selected" : '' ?>>18% Total - Standard</option>
 						<option value="25.0" <?php echo isset($interest_rate) && $interest_rate == 25.0 ? "selected" : '' ?>>25% Total - Moderate Risk</option>
 						<option value="28.0" <?php echo isset($interest_rate) && $interest_rate == 28.0 ? "selected" : '' ?>>28% Total - Medium Risk</option>
 						<option value="30.0" <?php echo isset($interest_rate) && $interest_rate == 30.0 ? "selected" : '' ?>>30% Total - Higher Risk</option>
@@ -364,12 +364,14 @@ if(isset($_GET['id'])){
 
 	// Weekly rates (fixed by length) - must match AppConfig::WEEKLY_RATES on the server
 	var WEEKLY_RATES = <?php echo json_encode(AppConfig::WEEKLY_RATES) ?>;
+	// 1-month loans use the 4-week rate; matches an option value in #interest_rate (e.g. "30.0")
+	var ONE_MONTH_RATE = '<?php echo number_format((float) AppConfig::ONE_MONTH_RATE, 1, '.', '') ?>';
 
 	function isWeekly() {
 		return $('#term_unit').val() === 'week';
 	}
 
-	// BUSINESS RULES: weekly loans fixed by length; 1-month loans fixed at 18%
+	// BUSINESS RULES: weekly loans fixed by length; 1-month loans fixed at the 4-week rate
 	function checkDurationAndSetRate() {
 		var duration = parseInt($('#duration_months').val());
 		$('#auto-rate-notice').remove();
@@ -392,10 +394,10 @@ if(isset($_GET['id'])){
 		$('#plan_id').prop('disabled', false);
 
 		if(duration === 1) {
-			// 1-month loan: automatically set to 18% TOTAL
-			$('#interest_rate').val('18.0');
+			// 1-month loan: automatically set to the 4-week rate
+			$('#interest_rate').val(ONE_MONTH_RATE);
 			$('#interest_rate').prop('disabled', true);
-			$('#interest_rate').after('<small class="text-success d-block mt-1" id="auto-rate-notice"><i class="fa fa-check-circle"></i> Auto-set: 1-month loans = 18% total interest</small>');
+			$('#interest_rate').after('<small class="text-success d-block mt-1" id="auto-rate-notice"><i class="fa fa-check-circle"></i> Auto-set: 1-month loans = ' + parseFloat(ONE_MONTH_RATE) + '% total interest (same as 4 weeks)</small>');
 		} else {
 			// Multi-month loan: admin must select rate (also TOTAL interest)
 			$('#interest_rate').prop('disabled', false);
@@ -432,12 +434,12 @@ if(isset($_GET['id'])){
 			return false;
 		}
 
-		// BUSINESS RULE: weekly loans use their fixed rate (server enforces it); 1-month loans auto-set to 18%
+		// BUSINESS RULE: weekly loans use their fixed rate (server enforces it); 1-month loans auto-set to the 4-week rate
 		if(isWeekly()) {
 			interest_rate = 0;
 		} else if(duration_months === 1) {
-			interest_rate = '18.0';
-			$('#interest_rate').val('18.0');
+			interest_rate = ONE_MONTH_RATE;
+			$('#interest_rate').val(ONE_MONTH_RATE);
 		}
 		// Multi-month loans: require admin to set rate
 		else if(interest_rate == '' || interest_rate == '0'){

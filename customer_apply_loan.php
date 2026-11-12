@@ -167,7 +167,7 @@ portal_header('Apply for Loan', 'apply', ['head' => $page_head]);
                             <?php endforeach; ?>
                         </optgroup>
                         <optgroup label="Monthly loans">
-                            <option value="month:1" data-rate="18" data-count="1" data-unit="month">1 month - 18% total interest</option>
+                            <option value="month:1" data-rate="<?php echo (float) AppConfig::ONE_MONTH_RATE; ?>" data-count="1" data-unit="month">1 month - <?php echo (float) AppConfig::ONE_MONTH_RATE; ?>% total interest (same as 4 weeks)</option>
                             <option value="month:multi" data-unit="month">2 or more months - rate set by our team</option>
                         </optgroup>
                     </select>
@@ -192,7 +192,7 @@ portal_header('Apply for Loan', 'apply', ['head' => $page_head]);
                         <?php endforeach; ?>
                     </div>
                     <small class="text-muted">
-                        1-month loans: 18% total interest. 2+ month loans: rate set after review.
+                        1-month loans: <?php echo (float) AppConfig::ONE_MONTH_RATE; ?>% total interest (same as 4 weeks). 2+ month loans: rate set after review.
                         <strong>All loans are collateral based.</strong>
                     </small>
                 </div>

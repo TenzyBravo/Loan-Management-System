@@ -14,6 +14,12 @@ class AppConfig {
         4 => 30.0,
     ];
 
+    /**
+     * 1-month loans: 4 weeks is a month, so they use the 4-week rate (TOTAL interest).
+     * Was 18% before 1 November 2026; existing loans keep the rate stored on them.
+     */
+    public const ONE_MONTH_RATE = self::WEEKLY_RATES[4];
+
     public const CURRENCY_SYMBOL = 'K';
     public const CURRENCY_CODE = 'ZMW';
     public const CURRENCY_NAME = 'Zambian Kwacha';

@@ -43,7 +43,7 @@ $stmt->close();
 
 // Determine if interest rate needs to be set
 // BUSINESS RULES: Weekly loans = fixed rate by length (15/20/25/30%)
-//                 1-month loans = 18% TOTAL (auto-assigned)
+//                 1-month loans = 4-week rate, AppConfig::ONE_MONTH_RATE (auto-assigned)
 //                 Multi-month loans = Admin must assign rate (can be changed during review)
 $duration_months = (int) ($loan['duration_months'] ?? 1);
 $term_unit = normalizeTermUnit($loan['term_unit'] ?? 'month');
@@ -55,7 +55,7 @@ $fixed_rate = 0;
 if ($is_weekly_loan) {
     try { $fixed_rate = weeklyRateFor($duration_months); } catch (Exception $e) { $fixed_rate = 0; }
 } elseif ($is_one_month_loan) {
-    $fixed_rate = 18.0;
+    $fixed_rate = (float) AppConfig::ONE_MONTH_RATE;
 }
 $term_label = formatLoanTerm($duration_months, $term_unit);
 $current_rate = $loan['interest_rate'] ?? 0;
@@ -436,7 +436,7 @@ $(document).ready(function() {
 <?php endif; ?>
 
 <?php if($auto_assigned_rate): ?>
-// Show calculation preview for fixed-rate loans (weekly, or 1-month at 18%)
+// Show calculation preview for fixed-rate loans (weekly, or 1-month at the 4-week rate)
 $(document).ready(function() {
     const amount = <?php echo (float) $loan['amount'] ?>;
     const rate = <?php echo (float) $fixed_rate ?>;
